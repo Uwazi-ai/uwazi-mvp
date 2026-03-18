@@ -79,6 +79,7 @@
   --font-sans: 'Inter', 'Inter Fallback', system-ui, sans-serif;
   --font-mono: 'Geist Mono', 'Geist Mono Fallback', monospace;
   --font-display: 'AXIS', 'Inter', system-ui, sans-serif;
+  --color-uwazi-green: #9bd34b;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);

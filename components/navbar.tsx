@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import Image from "next/image"
 import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/lib/auth-context"
@@ -23,7 +24,14 @@ export function Navbar() {
       <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2">
-          <span className="text-xl font-bold tracking-tight text-primary">UWAZI</span>
+          <Image
+            src="/images/uwazi-logo.png"
+            alt="The Uwazi App"
+            width={140}
+            height={40}
+            className="h-8 w-auto"
+            priority
+          />
         </Link>
 
         {/* Desktop Navigation */}

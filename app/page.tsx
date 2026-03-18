@@ -20,7 +20,7 @@ export default function HomePage() {
             <div className="relative mx-auto max-w-4xl text-center">
               <h1 className="text-balance text-4xl font-bold tracking-tight text-foreground sm:text-5xl lg:text-6xl">
                 Understand what&apos;s shaping your{" "}
-                <span className="text-primary">community.</span>
+                <span className="text-uwazi-green">community.</span>
               </h1>
               <p className="mx-auto mt-6 max-w-2xl text-pretty text-lg leading-relaxed text-muted-foreground sm:text-xl">
                 UWAZI helps you understand legislation, policy, and civic issues in plain English. 
@@ -100,7 +100,7 @@ export default function HomePage() {
           <section className="border-t border-border px-4 py-16 sm:px-6 lg:px-8">
             <div className="mx-auto max-w-5xl">
               <h2 className="mb-12 text-center text-3xl font-bold text-foreground">
-                Why <span className="text-primary">UWAZI</span>?
+                Why <span className="text-uwazi-green">UWAZI</span>?
               </h2>
               <div className="grid gap-8 sm:grid-cols-3">
                 <div className="text-center">
@@ -160,7 +160,7 @@ export default function HomePage() {
           <div className="mx-auto max-w-5xl">
             <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
               <div className="flex items-center gap-2">
-                <span className="text-lg font-bold text-primary">UWAZI</span>
+                <span className="text-lg font-bold text-uwazi-green">UWAZI</span>
                 <span className="text-sm text-muted-foreground">Civic clarity for everyone.</span>
               </div>
               <p className="text-sm text-muted-foreground">
