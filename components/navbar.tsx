@@ -27,9 +27,9 @@ export function Navbar() {
           <Image
             src="/images/uwazi-logo.png"
             alt="The Uwazi App"
-            width={140}
-            height={40}
-            className="h-8 w-auto"
+            width={180}
+            height={52}
+            className="h-12 w-auto"
             priority
           />
         </Link>
