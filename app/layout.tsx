@@ -15,8 +15,6 @@ const geistMono = Geist_Mono({
   display: 'swap',
 })
 
-// Using Oswald as a temporary display font until the custom Axis Extrabold font is uploaded
-// To use the custom font, upload "Axis Extrabold.otf" to /app/fonts/ and uncomment the localFont import
 const axisDisplay = Oswald({
   subsets: ['latin'],
   variable: '--font-axis',
