@@ -1,206 +1,368 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Textarea } from "@/components/ui/textarea"
 import { Navbar } from "@/components/navbar"
 import { Providers } from "@/components/providers"
 import { useAuth } from "@/lib/auth-context"
 import { examplePrompts, mockAnswer, type UwaziAnswer } from "@/lib/mock-data"
-import { Send, Bookmark, Loader2, Sparkles, AlertCircle, Lightbulb, ArrowRight, FileText } from "lucide-react"
+import { 
+  Send, 
+  Bookmark, 
+  Sparkles, 
+  ArrowUp,
+  Copy,
+  Check,
+  RotateCcw,
+  Zap,
+  MessageSquare,
+  Scale,
+  FileText,
+  Lightbulb,
+  ExternalLink
+} from "lucide-react"
 import Link from "next/link"
+
+interface Message {
+  id: string
+  type: "user" | "assistant"
+  content: string
+  answer?: UwaziAnswer
+  timestamp: Date
+}
+
+function TypingIndicator() {
+  return (
+    <div className="flex items-center gap-1 px-1">
+      <div className="h-2 w-2 animate-bounce rounded-full bg-primary [animation-delay:-0.3s]" />
+      <div className="h-2 w-2 animate-bounce rounded-full bg-primary [animation-delay:-0.15s]" />
+      <div className="h-2 w-2 animate-bounce rounded-full bg-primary" />
+    </div>
+  )
+}
 
 function AskUwaziContent() {
   const { user } = useAuth()
-  const [question, setQuestion] = useState("")
-  const [answer, setAnswer] = useState<UwaziAnswer | null>(null)
+  const [input, setInput] = useState("")
+  const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
-  const [isSaved, setIsSaved] = useState(false)
+  const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [savedIds, setSavedIds] = useState<Set<string>>(new Set())
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  const handleAsk = async () => {
-    if (!question.trim()) return
-    
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }
+
+  useEffect(() => {
+    scrollToBottom()
+  }, [messages, isLoading])
+
+  // Auto-resize textarea
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto"
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`
+    }
+  }, [input])
+
+  const handleSubmit = async (e?: React.FormEvent) => {
+    e?.preventDefault()
+    if (!input.trim() || isLoading) return
+
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      type: "user",
+      content: input.trim(),
+      timestamp: new Date(),
+    }
+
+    setMessages((prev) => [...prev, userMessage])
+    setInput("")
     setIsLoading(true)
-    setAnswer(null)
-    setIsSaved(false)
-    
+
     // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1500))
-    
-    setAnswer(mockAnswer)
+    await new Promise((resolve) => setTimeout(resolve, 2000))
+
+    const assistantMessage: Message = {
+      id: (Date.now() + 1).toString(),
+      type: "assistant",
+      content: mockAnswer.quickAnswer,
+      answer: mockAnswer,
+      timestamp: new Date(),
+    }
+
+    setMessages((prev) => [...prev, assistantMessage])
     setIsLoading(false)
   }
 
-  const handleSave = () => {
-    if (!user) {
-      // Redirect to login would happen here
-      return
-    }
-    setIsSaved(true)
+  const handlePromptClick = (prompt: string) => {
+    setInput(prompt)
+    textareaRef.current?.focus()
   }
 
-  const handlePromptClick = (prompt: string) => {
-    setQuestion(prompt)
+  const handleCopy = async (text: string, id: string) => {
+    await navigator.clipboard.writeText(text)
+    setCopiedId(id)
+    setTimeout(() => setCopiedId(null), 2000)
   }
+
+  const handleSave = (id: string) => {
+    setSavedIds((prev) => new Set(prev).add(id))
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault()
+      handleSubmit()
+    }
+  }
+
+  const handleNewChat = () => {
+    setMessages([])
+    setInput("")
+  }
+
+  const isEmpty = messages.length === 0
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="flex min-h-screen flex-col bg-background">
       <Navbar />
-      
-      <main className="px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
-        <div className="mx-auto max-w-3xl">
-          {/* Header */}
-          <div className="mb-8 text-center">
-            <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-              Ask <span className="text-primary">Uwazi</span>
-            </h1>
-            <p className="mt-3 text-muted-foreground">
-              Get clear, plain-English answers about legislation, policy, and civic issues.
-            </p>
-          </div>
 
-          {/* Question Input */}
-          <Card className="mb-6 border-border bg-card">
-            <CardContent className="p-4 sm:p-6">
-              <Textarea
-                placeholder="What would you like to understand? Ask about any policy, bill, or civic issue..."
-                value={question}
-                onChange={(e) => setQuestion(e.target.value)}
-                className="min-h-[120px] resize-none border-border bg-input text-foreground placeholder:text-muted-foreground focus:ring-primary"
-              />
-              
-              {/* Example Prompts */}
-              <div className="mt-4">
-                <p className="mb-2 text-sm text-muted-foreground">Try asking:</p>
-                <div className="flex flex-wrap gap-2">
-                  {examplePrompts.map((prompt, index) => (
-                    <button
-                      key={index}
-                      onClick={() => handlePromptClick(prompt)}
-                      className="rounded-full border border-border bg-secondary px-3 py-1.5 text-sm text-secondary-foreground transition-colors hover:bg-muted hover:text-foreground"
-                    >
-                      {prompt}
-                    </button>
-                  ))}
+      <main className="flex flex-1 flex-col">
+        {/* Messages Area */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="mx-auto max-w-3xl px-4 py-6">
+            {isEmpty ? (
+              /* Empty State - Centered Hero */
+              <div className="flex min-h-[60vh] flex-col items-center justify-center">
+                <div className="mb-2 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 ring-1 ring-primary/20">
+                  <Sparkles className="h-8 w-8 text-primary" />
+                </div>
+                <h1 className="mt-4 text-center text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+                  Ask <span className="text-primary">Uwazi</span>
+                </h1>
+                <p className="mt-3 max-w-md text-center text-muted-foreground">
+                  Get clear, plain-English answers about legislation, policy, and civic issues.
+                </p>
+
+                {/* Suggested Prompts Grid */}
+                <div className="mt-10 grid w-full max-w-2xl gap-3 sm:grid-cols-2">
+                  {examplePrompts.slice(0, 4).map((prompt, index) => {
+                    const icons = [Scale, FileText, MessageSquare, Lightbulb]
+                    const Icon = icons[index % icons.length]
+                    return (
+                      <button
+                        key={index}
+                        onClick={() => handlePromptClick(prompt)}
+                        className="group flex items-start gap-3 rounded-xl border border-border bg-card p-4 text-left transition-all hover:border-primary/50 hover:bg-card/80"
+                      >
+                        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-secondary text-muted-foreground transition-colors group-hover:bg-primary/10 group-hover:text-primary">
+                          <Icon className="h-4 w-4" />
+                        </div>
+                        <span className="text-sm leading-relaxed text-muted-foreground transition-colors group-hover:text-foreground">
+                          {prompt}
+                        </span>
+                      </button>
+                    )
+                  })}
                 </div>
               </div>
+            ) : (
+              /* Chat Messages */
+              <div className="space-y-6 pb-32">
+                {messages.map((message) => (
+                  <div key={message.id} className="group">
+                    {message.type === "user" ? (
+                      /* User Message */
+                      <div className="flex justify-end">
+                        <div className="max-w-[85%] rounded-2xl rounded-br-md bg-primary px-4 py-3 text-primary-foreground">
+                          <p className="whitespace-pre-wrap">{message.content}</p>
+                        </div>
+                      </div>
+                    ) : (
+                      /* Assistant Message */
+                      <div className="space-y-4">
+                        <div className="flex items-start gap-3">
+                          <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-primary/10 ring-1 ring-primary/20">
+                            <Sparkles className="h-4 w-4 text-primary" />
+                          </div>
+                          <div className="min-w-0 flex-1 space-y-4">
+                            {/* Quick Answer */}
+                            <div>
+                              <p className="leading-relaxed text-foreground">{message.answer?.quickAnswer}</p>
+                            </div>
 
-              <div className="mt-4 flex justify-end">
+                            {/* In Plain English */}
+                            {message.answer?.plainEnglish && (
+                              <div className="rounded-xl border border-border bg-secondary/30 p-4">
+                                <div className="mb-2 flex items-center gap-2 text-sm font-medium text-primary">
+                                  <FileText className="h-4 w-4" />
+                                  In Plain English
+                                </div>
+                                <p className="text-sm leading-relaxed text-muted-foreground">
+                                  {message.answer.plainEnglish}
+                                </p>
+                              </div>
+                            )}
+
+                            {/* Why This Matters */}
+                            {message.answer?.whyItMatters && (
+                              <div className="rounded-xl border border-border bg-secondary/30 p-4">
+                                <div className="mb-2 flex items-center gap-2 text-sm font-medium text-primary">
+                                  <Zap className="h-4 w-4" />
+                                  Why This Matters
+                                </div>
+                                <p className="text-sm leading-relaxed text-muted-foreground">
+                                  {message.answer.whyItMatters}
+                                </p>
+                              </div>
+                            )}
+
+                            {/* What You Can Do */}
+                            {message.answer?.whatYouCanDo && (
+                              <div className="rounded-xl border border-primary/30 bg-primary/5 p-4">
+                                <div className="mb-2 flex items-center gap-2 text-sm font-medium text-primary">
+                                  <Lightbulb className="h-4 w-4" />
+                                  What You Can Do
+                                </div>
+                                <p className="text-sm leading-relaxed text-muted-foreground">
+                                  {message.answer.whatYouCanDo}
+                                </p>
+                              </div>
+                            )}
+
+                            {/* Source Note */}
+                            {message.answer?.sourceNote && (
+                              <div className="flex items-start gap-2 text-xs text-muted-foreground">
+                                <ExternalLink className="mt-0.5 h-3 w-3 flex-shrink-0" />
+                                <span>{message.answer.sourceNote}</span>
+                              </div>
+                            )}
+
+                            {/* Action Buttons */}
+                            <div className="flex items-center gap-1 pt-2 opacity-0 transition-opacity group-hover:opacity-100">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 gap-1.5 px-2 text-xs text-muted-foreground hover:text-foreground"
+                                onClick={() =>
+                                  handleCopy(
+                                    `${message.answer?.quickAnswer}\n\n${message.answer?.plainEnglish}`,
+                                    message.id
+                                  )
+                                }
+                              >
+                                {copiedId === message.id ? (
+                                  <Check className="h-3.5 w-3.5" />
+                                ) : (
+                                  <Copy className="h-3.5 w-3.5" />
+                                )}
+                                {copiedId === message.id ? "Copied" : "Copy"}
+                              </Button>
+                              {user ? (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className={`h-8 gap-1.5 px-2 text-xs ${
+                                    savedIds.has(message.id)
+                                      ? "text-primary"
+                                      : "text-muted-foreground hover:text-foreground"
+                                  }`}
+                                  onClick={() => handleSave(message.id)}
+                                >
+                                  <Bookmark
+                                    className={`h-3.5 w-3.5 ${savedIds.has(message.id) ? "fill-current" : ""}`}
+                                  />
+                                  {savedIds.has(message.id) ? "Saved" : "Save"}
+                                </Button>
+                              ) : (
+                                <Link href="/login">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 gap-1.5 px-2 text-xs text-muted-foreground hover:text-foreground"
+                                  >
+                                    <Bookmark className="h-3.5 w-3.5" />
+                                    Save
+                                  </Button>
+                                </Link>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+
+                {/* Typing Indicator */}
+                {isLoading && (
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-primary/10 ring-1 ring-primary/20">
+                      <Sparkles className="h-4 w-4 text-primary" />
+                    </div>
+                    <div className="rounded-2xl rounded-tl-md bg-secondary px-4 py-3">
+                      <TypingIndicator />
+                    </div>
+                  </div>
+                )}
+
+                <div ref={messagesEndRef} />
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Input Area - Fixed at Bottom */}
+        <div className="sticky bottom-0 border-t border-border bg-background/80 backdrop-blur-xl">
+          <div className="mx-auto max-w-3xl px-4 py-4">
+            {/* New Chat Button - Show when there are messages */}
+            {!isEmpty && (
+              <div className="mb-3 flex justify-center">
                 <Button
-                  onClick={handleAsk}
-                  disabled={!question.trim() || isLoading}
-                  className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90"
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleNewChat}
+                  className="gap-2 text-xs text-muted-foreground hover:text-foreground"
                 >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Thinking...
-                    </>
-                  ) : (
-                    <>
-                      <Send className="h-4 w-4" />
-                      Ask Uwazi
-                    </>
-                  )}
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  New conversation
                 </Button>
               </div>
-            </CardContent>
-          </Card>
+            )}
 
-          {/* Loading State */}
-          {isLoading && (
-            <Card className="border-border bg-card">
-              <CardContent className="flex items-center justify-center py-12">
-                <div className="text-center">
-                  <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary" />
-                  <p className="mt-4 text-muted-foreground">Analyzing your question...</p>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Answer Card */}
-          {answer && !isLoading && (
-            <Card className="border-border bg-card">
-              <CardHeader className="flex flex-row items-center justify-between border-b border-border pb-4">
-                <CardTitle className="flex items-center gap-2 text-xl text-foreground">
-                  <Sparkles className="h-5 w-5 text-primary" />
-                  Uwazi&apos;s Answer
-                </CardTitle>
-                {user ? (
+            {/* Input Container */}
+            <form onSubmit={handleSubmit} className="relative">
+              <div className="relative flex items-end rounded-2xl border border-border bg-card shadow-lg ring-1 ring-black/5 transition-all focus-within:border-primary/50 focus-within:ring-primary/20">
+                <textarea
+                  ref={textareaRef}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Ask about any policy, bill, or civic issue..."
+                  rows={1}
+                  className="max-h-[200px] min-h-[56px] flex-1 resize-none bg-transparent px-4 py-4 pr-14 text-foreground placeholder:text-muted-foreground focus:outline-none"
+                />
+                <div className="absolute bottom-2 right-2">
                   <Button
-                    variant={isSaved ? "default" : "outline"}
-                    size="sm"
-                    onClick={handleSave}
-                    className={isSaved ? "bg-primary text-primary-foreground" : ""}
+                    type="submit"
+                    size="icon"
+                    disabled={!input.trim() || isLoading}
+                    className="h-10 w-10 rounded-xl bg-primary text-primary-foreground shadow-md transition-all hover:bg-primary/90 hover:shadow-lg disabled:opacity-40"
                   >
-                    <Bookmark className={`mr-2 h-4 w-4 ${isSaved ? "fill-current" : ""}`} />
-                    {isSaved ? "Saved" : "Save Answer"}
+                    <ArrowUp className="h-5 w-5" />
                   </Button>
-                ) : (
-                  <Link href="/login">
-                    <Button variant="outline" size="sm">
-                      <Bookmark className="mr-2 h-4 w-4" />
-                      Login to Save
-                    </Button>
-                  </Link>
-                )}
-              </CardHeader>
-              <CardContent className="space-y-6 p-4 sm:p-6">
-                {/* Quick Answer */}
-                <div>
-                  <h3 className="mb-2 flex items-center gap-2 font-semibold text-foreground">
-                    <div className="h-1.5 w-1.5 rounded-full bg-primary" />
-                    Quick Answer
-                  </h3>
-                  <p className="text-muted-foreground">{answer.quickAnswer}</p>
                 </div>
+              </div>
+            </form>
 
-                {/* In Plain English */}
-                <div className="rounded-lg border border-border bg-secondary/50 p-4">
-                  <h3 className="mb-2 flex items-center gap-2 font-semibold text-foreground">
-                    <FileText className="h-4 w-4 text-primary" />
-                    In Plain English
-                  </h3>
-                  <p className="leading-relaxed text-muted-foreground">{answer.plainEnglish}</p>
-                </div>
-
-                {/* Why This Matters */}
-                <div>
-                  <h3 className="mb-2 flex items-center gap-2 font-semibold text-foreground">
-                    <AlertCircle className="h-4 w-4 text-primary" />
-                    Why This Matters
-                  </h3>
-                  <p className="text-muted-foreground">{answer.whyItMatters}</p>
-                </div>
-
-                {/* What You Can Do */}
-                <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
-                  <h3 className="mb-2 flex items-center gap-2 font-semibold text-foreground">
-                    <Lightbulb className="h-4 w-4 text-primary" />
-                    What You Can Do Next
-                  </h3>
-                  <p className="text-muted-foreground">{answer.whatYouCanDo}</p>
-                </div>
-
-                {/* Source Note */}
-                <div className="border-t border-border pt-4">
-                  <p className="flex items-start gap-2 text-sm text-muted-foreground">
-                    <ArrowRight className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" />
-                    <span>{answer.sourceNote}</span>
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Empty State */}
-          {!answer && !isLoading && (
-            <div className="text-center text-muted-foreground">
-              <p>Your answer will appear here after you ask a question.</p>
-            </div>
-          )}
+            {/* Footer Note */}
+            <p className="mt-3 text-center text-xs text-muted-foreground">
+              Uwazi uses AI to simplify complex civic information. Always verify with official sources.
+            </p>
+          </div>
         </div>
       </main>
     </div>
