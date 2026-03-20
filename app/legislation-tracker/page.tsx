@@ -1,140 +1,40 @@
-"use client"
+import { auth } from "@/auth"
+import { sql } from "@/lib/db"
+import TrackerClient from "./TrackerClient"
 
-import { useState, useMemo } from "react"
-import { Input } from "@/components/ui/input"
-import { Navbar } from "@/components/navbar"
-import { Providers } from "@/components/providers"
-import { BillCard } from "@/components/bill-card"
-import { mockBills, type Bill } from "@/lib/mock-data"
-import { Search } from "lucide-react"
+export default async function LegislationTrackerPage() {
+  const session = await auth()
 
-type JurisdictionFilter = "All" | Bill["jurisdiction"]
+  const bills = await sql`
+    select id, bill_number, title, jurisdiction, status, summary_plain
+    from bills
+    order by updated_at desc
+  `
 
-const jurisdictionFilters: JurisdictionFilter[] = ["All", "Federal", "State", "Local"]
-
-function LegislationTrackerContent() {
-  const [searchQuery, setSearchQuery] = useState("")
-  const [activeFilter, setActiveFilter] = useState<JurisdictionFilter>("All")
-  const [trackedBills, setTrackedBills] = useState<Set<string>>(new Set())
-
-  const filteredBills = useMemo(() => {
-    return mockBills.filter((bill) => {
-      const matchesSearch =
-        bill.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        bill.billNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        bill.summary.toLowerCase().includes(searchQuery.toLowerCase())
-
-      const matchesFilter = activeFilter === "All" || bill.jurisdiction === activeFilter
-
-      return matchesSearch && matchesFilter
-    })
-  }, [searchQuery, activeFilter])
-
-  const handleTrack = (billId: string) => {
-    setTrackedBills((prev) => {
-      const newSet = new Set(prev)
-      if (newSet.has(billId)) {
-        newSet.delete(billId)
-      } else {
-        newSet.add(billId)
-      }
-      return newSet
-    })
-  }
+  const billsForClient = bills.map((b) => ({
+    id: b.id,
+    bill_number: b.bill_number,
+    title: b.title,
+    jurisdiction: b.jurisdiction,
+    status: b.status,
+    summary_plain: b.summary_plain ?? "",
+  }))
 
   return (
-    <div className="min-h-screen bg-background">
-      <Navbar />
-      
-      <main className="px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
-        <div className="mx-auto max-w-6xl">
-          {/* Header */}
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-              Legislation <span className="text-primary">Tracker</span>
-            </h1>
-            <p className="mt-3 text-muted-foreground">
-              Browse and track bills at the federal, state, and local level.
-            </p>
-          </div>
-
-          {/* Search and Filters */}
-          <div className="mb-8 space-y-4">
-            {/* Search Input */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                type="text"
-                placeholder="Search bills by title, number, or keywords..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 border-border bg-input text-foreground placeholder:text-muted-foreground focus:ring-primary"
-              />
-            </div>
-
-            {/* Filter Pills */}
-            <div className="flex flex-wrap gap-2">
-              {jurisdictionFilters.map((filter) => (
-                <button
-                  key={filter}
-                  onClick={() => setActiveFilter(filter)}
-                  className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
-                    activeFilter === filter
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-secondary text-secondary-foreground hover:bg-muted"
-                  }`}
-                >
-                  {filter}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Results Count */}
-          <div className="mb-6">
-            <p className="text-sm text-muted-foreground">
-              Showing {filteredBills.length} {filteredBills.length === 1 ? "bill" : "bills"}
-              {activeFilter !== "All" && ` in ${activeFilter}`}
-              {searchQuery && ` matching "${searchQuery}"`}
-            </p>
-          </div>
-
-          {/* Bills Grid */}
-          {filteredBills.length > 0 ? (
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {filteredBills.map((bill) => (
-                <BillCard
-                  key={bill.id}
-                  bill={bill}
-                  onTrack={handleTrack}
-                  isTracked={trackedBills.has(bill.id)}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="rounded-lg border border-border bg-card py-12 text-center">
-              <p className="text-muted-foreground">No bills found matching your criteria.</p>
-              <button
-                onClick={() => {
-                  setSearchQuery("")
-                  setActiveFilter("All")
-                }}
-                className="mt-4 text-sm text-primary hover:underline"
-              >
-                Clear filters
-              </button>
-            </div>
-          )}
+    <main className="min-h-screen bg-black px-6 py-12 text-white">
+      <div className="mx-auto max-w-5xl space-y-8">
+        <div>
+          <h1 className="font-heading text-5xl">Legislation Tracker</h1>
+          <p className="mt-3 text-white/70">
+            Track bills and understand what they actually mean.
+          </p>
         </div>
-      </main>
-    </div>
-  )
-}
 
-export default function LegislationTrackerPage() {
-  return (
-    <Providers>
-      <LegislationTrackerContent />
-    </Providers>
+        <TrackerClient
+          bills={billsForClient}
+          isLoggedIn={!!session?.user?.email}
+        />
+      </div>
+    </main>
   )
 }

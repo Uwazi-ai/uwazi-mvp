@@ -1,194 +1,91 @@
-"use client"
+import { auth } from "@/auth"
+import { redirect } from "next/navigation"
+import { sql } from "@/lib/db"
+import { ensureUser } from "@/lib/ensure-user"
 
-import { useRouter } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Navbar } from "@/components/navbar"
-import { Providers } from "@/components/providers"
-import { useAuth } from "@/lib/auth-context"
-import { User, BookmarkCheck, MessageSquare, LogOut, FileText, ArrowRight } from "lucide-react"
-import Link from "next/link"
+export default async function AccountPage() {
+  const session = await auth()
 
-// Mock saved data
-const mockSavedQuestions = [
-  {
-    id: "1",
-    question: "What does the Community Investment Act mean for small businesses?",
-    savedAt: "2026-03-15",
-  },
-  {
-    id: "2",
-    question: "How will the digital privacy law affect my data?",
-    savedAt: "2026-03-10",
-  },
-]
-
-const mockTrackedBills = [
-  {
-    id: "1",
-    billNumber: "H.R. 2847",
-    title: "Community Investment and Opportunity Act",
-    status: "In Committee",
-  },
-  {
-    id: "3",
-    billNumber: "A.B. 445",
-    title: "Clean Energy Transition Initiative",
-    status: "Introduced",
-  },
-]
-
-function AccountContent() {
-  const router = useRouter()
-  const { user, logout } = useAuth()
-
-  const handleLogout = () => {
-    logout()
-    router.push("/")
+  if (!session?.user?.email) {
+    redirect("/login")
   }
 
-  // Redirect if not logged in
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-background">
-        <Navbar />
-        <main className="flex items-center justify-center px-4 py-16 sm:px-6 lg:px-8">
-          <Card className="w-full max-w-md border-border bg-card text-center">
-            <CardContent className="py-12">
-              <User className="mx-auto h-12 w-12 text-muted-foreground" />
-              <h2 className="mt-4 text-xl font-semibold text-foreground">Not signed in</h2>
-              <p className="mt-2 text-muted-foreground">
-                Sign in to access your account and saved content.
-              </p>
-              <Link href="/login" className="mt-6 inline-block">
-                <Button className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90">
-                  Sign In
-                  <ArrowRight className="h-4 w-4" />
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
-        </main>
-      </div>
-    )
-  }
+  await ensureUser({
+    email: session.user.email,
+    name: session.user.name,
+    image: session.user.image,
+  })
+
+  const savedQuestions = await sql`
+    select * from saved_questions
+    where user_email = ${session.user.email}
+    order by created_at desc
+  `
+
+  const trackedBills = await sql`
+    select b.*
+    from tracked_bills tb
+    join bills b on b.id = tb.bill_id
+    where tb.user_email = ${session.user.email}
+    order by tb.created_at desc
+  `
 
   return (
-    <div className="min-h-screen bg-background">
-      <Navbar />
-      
-      <main className="px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
-        <div className="mx-auto max-w-4xl">
-          {/* Profile Header */}
-          <Card className="mb-8 border-border bg-card">
-            <CardContent className="flex flex-col items-center gap-4 p-6 sm:flex-row sm:items-start">
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-                <User className="h-8 w-8 text-primary" />
-              </div>
-              <div className="flex-1 text-center sm:text-left">
-                <h1 className="text-2xl font-bold text-foreground">{user.name}</h1>
-                <p className="text-muted-foreground">{user.email}</p>
-              </div>
-              <Button
-                variant="outline"
-                onClick={handleLogout}
-                className="gap-2"
-              >
-                <LogOut className="h-4 w-4" />
-                Logout
-              </Button>
-            </CardContent>
-          </Card>
-
-          {/* Content Grid */}
-          <div className="grid gap-6 md:grid-cols-2">
-            {/* Saved Questions */}
-            <Card className="border-border bg-card">
-              <CardHeader className="border-b border-border">
-                <CardTitle className="flex items-center gap-2 text-lg text-foreground">
-                  <MessageSquare className="h-5 w-5 text-primary" />
-                  Saved Questions
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-4">
-                {mockSavedQuestions.length > 0 ? (
-                  <ul className="space-y-3">
-                    {mockSavedQuestions.map((q) => (
-                      <li
-                        key={q.id}
-                        className="rounded-lg border border-border bg-secondary/50 p-3 transition-colors hover:bg-secondary"
-                      >
-                        <p className="text-sm text-foreground">{q.question}</p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          Saved on {new Date(q.savedAt).toLocaleDateString()}
-                        </p>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <div className="py-8 text-center">
-                    <MessageSquare className="mx-auto h-8 w-8 text-muted-foreground" />
-                    <p className="mt-2 text-sm text-muted-foreground">No saved questions yet</p>
-                    <Link href="/ask-uwazi" className="mt-3 inline-block">
-                      <Button variant="outline" size="sm" className="gap-2">
-                        Ask Uwazi
-                        <ArrowRight className="h-4 w-4" />
-                      </Button>
-                    </Link>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Tracked Bills */}
-            <Card className="border-border bg-card">
-              <CardHeader className="border-b border-border">
-                <CardTitle className="flex items-center gap-2 text-lg text-foreground">
-                  <BookmarkCheck className="h-5 w-5 text-primary" />
-                  Tracked Bills
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-4">
-                {mockTrackedBills.length > 0 ? (
-                  <ul className="space-y-3">
-                    {mockTrackedBills.map((bill) => (
-                      <li key={bill.id}>
-                        <Link
-                          href={`/legislation-tracker/${bill.id}`}
-                          className="block rounded-lg border border-border bg-secondary/50 p-3 transition-colors hover:bg-secondary"
-                        >
-                          <p className="text-sm font-medium text-primary">{bill.billNumber}</p>
-                          <p className="mt-0.5 text-sm text-foreground">{bill.title}</p>
-                          <p className="mt-1 text-xs text-muted-foreground">Status: {bill.status}</p>
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <div className="py-8 text-center">
-                    <FileText className="mx-auto h-8 w-8 text-muted-foreground" />
-                    <p className="mt-2 text-sm text-muted-foreground">No tracked bills yet</p>
-                    <Link href="/legislation-tracker" className="mt-3 inline-block">
-                      <Button variant="outline" size="sm" className="gap-2">
-                        Browse Bills
-                        <ArrowRight className="h-4 w-4" />
-                      </Button>
-                    </Link>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+    <main className="min-h-screen bg-black px-6 py-12 text-white">
+      <div className="mx-auto max-w-5xl space-y-10">
+        <div>
+          <h1 className="font-heading text-5xl">Your Account</h1>
+          <p className="mt-2 text-white/70">{session.user.email}</p>
         </div>
-      </main>
-    </div>
-  )
-}
 
-export default function AccountPage() {
-  return (
-    <Providers>
-      <AccountContent />
-    </Providers>
+        <section>
+          <h2 className="font-heading text-3xl text-[#9bd34b]">Saved Questions</h2>
+          <div className="mt-4 space-y-4">
+            {savedQuestions.length === 0 ? (
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-5 text-white/60">
+                No saved questions yet.
+              </div>
+            ) : (
+              savedQuestions.map((item: any) => (
+                <div
+                  key={item.id}
+                  className="rounded-2xl border border-white/10 bg-white/5 p-5"
+                >
+                  <p className="font-semibold text-[#9bd34b]">{item.question}</p>
+                  <pre className="mt-3 whitespace-pre-wrap text-sm text-white/80">
+                    {JSON.stringify(item.answer, null, 2)}
+                  </pre>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
+
+        <section>
+          <h2 className="font-heading text-3xl text-[#9bd34b]">Tracked Bills</h2>
+          <div className="mt-4 space-y-4">
+            {trackedBills.length === 0 ? (
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-5 text-white/60">
+                No tracked bills yet.
+              </div>
+            ) : (
+              trackedBills.map((bill: any) => (
+                <div
+                  key={bill.id}
+                  className="rounded-2xl border border-white/10 bg-white/5 p-5"
+                >
+                  <p className="text-sm text-white/60">
+                    {bill.bill_number} • {bill.jurisdiction}
+                  </p>
+                  <h3 className="mt-1 font-heading text-2xl">{bill.title}</h3>
+                  <p className="mt-2 text-white/80">{bill.summary_plain}</p>
+                  <p className="mt-2 text-sm text-[#9bd34b]">Status: {bill.status}</p>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
+      </div>
+    </main>
   )
 }

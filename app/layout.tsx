@@ -16,8 +16,8 @@ const geistMono = Geist_Mono({
   display: 'swap',
 })
 
-const axisExtrabold = localFont({
-  src: './fonts/Axis Extrabold.otf',
+const axisFont = localFont({
+  src: './fonts/Axis-Extrabold.otf',
   variable: '--font-axis',
   display: 'swap',
   weight: '800',
@@ -59,7 +59,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark">
-      <body className={`${inter.variable} ${geistMono.variable} ${axisExtrabold.variable} font-sans antialiased`}>
+      <body className={`${inter.variable} ${geistMono.variable} ${axisFont.variable} font-sans antialiased`}>
         {children}
         <Analytics />
       </body>
