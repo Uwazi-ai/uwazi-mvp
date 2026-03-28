@@ -126,20 +126,7 @@ function ResponseSection({
 function AskUwaziContent() {
   const { user } = useAuth()
   const [inputValue, setInputValue] = useState("")
-  const [conversations, setConversations] = useState<Conversation[]>([
-    {
-      id: "demo-1",
-      title: "Housing Policy Question",
-      preview: "What does the new housing bill mean for renters?",
-      timestamp: new Date(Date.now() - 86400000),
-    },
-    {
-      id: "demo-2", 
-      title: "Data Privacy Rights",
-      preview: "What are my rights under the new data privacy law?",
-      timestamp: new Date(Date.now() - 172800000),
-    },
-  ])
+  const [conversations, setConversations] = useState<Conversation[]>([])
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set())
