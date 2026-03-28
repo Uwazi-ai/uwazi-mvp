@@ -193,8 +193,20 @@ function AskUwaziContent() {
   }
 
   const handlePromptClick = (prompt: string) => {
-    setInputValue(prompt)
-    textareaRef.current?.focus()
+    if (isLoading) return
+    
+    // Create new conversation
+    const newConversation: Conversation = {
+      id: Date.now().toString(),
+      title: prompt.slice(0, 40) + (prompt.length > 40 ? "..." : ""),
+      preview: prompt,
+      timestamp: new Date(),
+    }
+    setConversations(prev => [newConversation, ...prev])
+    setActiveConversationId(newConversation.id)
+    
+    // Send message directly
+    sendMessage({ text: prompt })
   }
 
   const handleCopy = async (text: string, id: string) => {
