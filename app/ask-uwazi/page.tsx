@@ -1,11 +1,13 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
+import { useChat } from "@ai-sdk/react"
+import { DefaultChatTransport } from "ai"
 import { Button } from "@/components/ui/button"
 import { Navbar } from "@/components/navbar"
 import { Providers } from "@/components/providers"
 import { useAuth } from "@/lib/auth-context"
-import { examplePrompts, mockAnswer, mockBills, type UwaziAnswer } from "@/lib/mock-data"
+import { examplePrompts, mockBills } from "@/lib/mock-data"
 import { 
   Send, 
   Bookmark, 
@@ -25,25 +27,23 @@ import {
   PanelLeftClose,
   PanelLeft,
   Loader2,
-  ChevronDown,
-  ChevronUp
 } from "lucide-react"
 import Link from "next/link"
-
-interface Message {
-  id: string
-  type: "user" | "assistant"
-  content: string
-  answer?: UwaziAnswer
-  timestamp: Date
-}
 
 interface Conversation {
   id: string
   title: string
   preview: string
   timestamp: Date
-  messages: Message[]
+}
+
+// Helper to extract text from UIMessage parts
+function getMessageText(message: { parts?: Array<{ type: string; text?: string }> }): string {
+  if (!message.parts || !Array.isArray(message.parts)) return ""
+  return message.parts
+    .filter((p): p is { type: "text"; text: string } => p.type === "text" && typeof p.text === "string")
+    .map((p) => p.text)
+    .join("")
 }
 
 // Thinking Animation Component
@@ -54,7 +54,7 @@ function ThinkingIndicator() {
         <Loader2 className="h-4 w-4 animate-spin text-uwazi-green" />
       </div>
       <div className="flex items-center gap-2">
-        <span className="text-sm text-muted-foreground">Researching</span>
+        <span className="text-sm text-muted-foreground">Thinking</span>
         <span className="flex gap-1">
           <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-uwazi-green/60 [animation-delay:-0.3s]" />
           <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-uwazi-green/60 [animation-delay:-0.15s]" />
@@ -65,120 +65,94 @@ function ThinkingIndicator() {
   )
 }
 
-// Streaming text animation hook
-function useStreamingText(text: string, isActive: boolean, speed: number = 15) {
-  const [displayedText, setDisplayedText] = useState("")
-  const [isComplete, setIsComplete] = useState(false)
+// Parse structured response sections from AI response
+function parseResponse(text: string) {
+  const sections: {
+    quickAnswer?: string
+    plainEnglish?: string
+    whyItMatters?: string
+    whatYouCanDo?: string
+    sources?: string
+  } = {}
 
-  useEffect(() => {
-    if (!isActive) {
-      setDisplayedText(text)
-      setIsComplete(true)
-      return
-    }
+  // Try to extract structured sections
+  const quickAnswerMatch = text.match(/\*\*Quick Answer:\*\*\s*([\s\S]*?)(?=\*\*In Plain English:\*\*|\*\*Why This Matters:\*\*|\*\*What You Can Do:\*\*|\*\*Sources:\*\*|$)/i)
+  const plainEnglishMatch = text.match(/\*\*In Plain English:\*\*\s*([\s\S]*?)(?=\*\*Why This Matters:\*\*|\*\*What You Can Do:\*\*|\*\*Sources:\*\*|$)/i)
+  const whyItMattersMatch = text.match(/\*\*Why This Matters:\*\*\s*([\s\S]*?)(?=\*\*What You Can Do:\*\*|\*\*Sources:\*\*|$)/i)
+  const whatYouCanDoMatch = text.match(/\*\*What You Can Do:\*\*\s*([\s\S]*?)(?=\*\*Sources:\*\*|$)/i)
+  const sourcesMatch = text.match(/\*\*Sources:\*\*\s*([\s\S]*?)$/i)
 
-    setDisplayedText("")
-    setIsComplete(false)
-    let index = 0
+  if (quickAnswerMatch) sections.quickAnswer = quickAnswerMatch[1].trim()
+  if (plainEnglishMatch) sections.plainEnglish = plainEnglishMatch[1].trim()
+  if (whyItMattersMatch) sections.whyItMatters = whyItMattersMatch[1].trim()
+  if (whatYouCanDoMatch) sections.whatYouCanDo = whatYouCanDoMatch[1].trim()
+  if (sourcesMatch) sections.sources = sourcesMatch[1].trim()
 
-    const interval = setInterval(() => {
-      if (index < text.length) {
-        setDisplayedText(text.slice(0, index + 1))
-        index++
-      } else {
-        setIsComplete(true)
-        clearInterval(interval)
-      }
-    }, speed)
-
-    return () => clearInterval(interval)
-  }, [text, isActive, speed])
-
-  return { displayedText, isComplete }
+  // If no structured sections found, treat the whole thing as the answer
+  const hasStructure = Object.keys(sections).length > 0
+  
+  return { sections, hasStructure, fullText: text }
 }
 
-// Collapsible Section Component
-function CollapsibleSection({ 
+// Response section component
+function ResponseSection({ 
   icon: Icon, 
   title, 
-  children, 
-  defaultOpen = true,
+  content,
   accentBorder = false
 }: { 
   icon: React.ElementType
   title: string
-  children: React.ReactNode
-  defaultOpen?: boolean
+  content: string
   accentBorder?: boolean
 }) {
-  const [isOpen, setIsOpen] = useState(defaultOpen)
-
   return (
-    <div className={`rounded-xl border transition-all ${
+    <div className={`rounded-xl border p-4 transition-all ${
       accentBorder 
         ? "border-uwazi-green/30 bg-uwazi-green/5" 
         : "border-border/50 bg-secondary/20"
     }`}>
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="flex w-full items-center justify-between p-3 text-left"
-      >
-        <div className="flex items-center gap-2 text-sm font-medium text-uwazi-green">
-          <Icon className="h-4 w-4" />
-          {title}
-        </div>
-        {isOpen ? (
-          <ChevronUp className="h-4 w-4 text-muted-foreground" />
-        ) : (
-          <ChevronDown className="h-4 w-4 text-muted-foreground" />
-        )}
-      </button>
-      {isOpen && (
-        <div className="border-t border-border/30 px-3 pb-3 pt-2">
-          {children}
-        </div>
-      )}
+      <div className="flex items-center gap-2 text-sm font-medium text-uwazi-green mb-2">
+        <Icon className="h-4 w-4" />
+        {title}
+      </div>
+      <p className="text-sm leading-relaxed text-muted-foreground whitespace-pre-wrap">
+        {content}
+      </p>
     </div>
   )
 }
 
-// Follow-up suggestion chips
-const followUpSuggestions = [
-  "Explain this in simpler terms",
-  "How does this affect me locally?",
-  "What should I do next?",
-  "Track this bill",
-  "Find related legislation",
-]
-
 function AskUwaziContent() {
   const { user } = useAuth()
-  const [input, setInput] = useState("")
+  const [inputValue, setInputValue] = useState("")
   const [conversations, setConversations] = useState<Conversation[]>([
     {
       id: "demo-1",
       title: "Housing Policy Question",
       preview: "What does the new housing bill mean for renters?",
       timestamp: new Date(Date.now() - 86400000),
-      messages: [],
     },
     {
       id: "demo-2", 
       title: "Data Privacy Rights",
       preview: "What are my rights under the new data privacy law?",
       timestamp: new Date(Date.now() - 172800000),
-      messages: [],
     },
   ])
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null)
-  const [messages, setMessages] = useState<Message[]>([])
-  const [isLoading, setIsLoading] = useState(false)
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set())
   const [sidebarOpen, setSidebarOpen] = useState(true)
-  const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // AI SDK useChat hook
+  const { messages, sendMessage, status, setMessages } = useChat({
+    transport: new DefaultChatTransport({ api: "/api/chat" }),
+  })
+
+  const isLoading = status === "streaming" || status === "submitted"
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -193,60 +167,33 @@ function AskUwaziContent() {
       textareaRef.current.style.height = "auto"
       textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`
     }
-  }, [input])
+  }, [inputValue])
 
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault()
-    if (!input.trim() || isLoading) return
+    if (!inputValue.trim() || isLoading) return
 
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      type: "user",
-      content: input.trim(),
-      timestamp: new Date(),
-    }
-
-    const newMessages = [...messages, userMessage]
-    setMessages(newMessages)
-    setInput("")
-    setIsLoading(true)
+    const userInput = inputValue.trim()
+    setInputValue("")
 
     // Create new conversation if none active
     if (!activeConversationId) {
       const newConversation: Conversation = {
         id: Date.now().toString(),
-        title: input.trim().slice(0, 40) + (input.length > 40 ? "..." : ""),
-        preview: input.trim(),
+        title: userInput.slice(0, 40) + (userInput.length > 40 ? "..." : ""),
+        preview: userInput,
         timestamp: new Date(),
-        messages: newMessages,
       }
       setConversations(prev => [newConversation, ...prev])
       setActiveConversationId(newConversation.id)
     }
 
-    await new Promise((resolve) => setTimeout(resolve, 1800))
-
-    const assistantMessageId = (Date.now() + 1).toString()
-    const assistantMessage: Message = {
-      id: assistantMessageId,
-      type: "assistant",
-      content: mockAnswer.quickAnswer,
-      answer: mockAnswer,
-      timestamp: new Date(),
-    }
-
-    setMessages((prev) => [...prev, assistantMessage])
-    setStreamingMessageId(assistantMessageId)
-    setIsLoading(false)
-
-    // Clear streaming after animation completes
-    setTimeout(() => {
-      setStreamingMessageId(null)
-    }, mockAnswer.quickAnswer.length * 15 + 500)
+    // Send message using AI SDK
+    sendMessage({ text: userInput })
   }
 
   const handlePromptClick = (prompt: string) => {
-    setInput(prompt)
+    setInputValue(prompt)
     textareaRef.current?.focus()
   }
 
@@ -270,12 +217,7 @@ function AskUwaziContent() {
   const handleNewChat = () => {
     setMessages([])
     setActiveConversationId(null)
-    setInput("")
-  }
-
-  const handleSelectConversation = (conv: Conversation) => {
-    setActiveConversationId(conv.id)
-    setMessages(conv.messages)
+    setInputValue("")
   }
 
   const isEmpty = messages.length === 0
@@ -310,7 +252,10 @@ function AskUwaziContent() {
                 {conversations.map((conv) => (
                   <button
                     key={conv.id}
-                    onClick={() => handleSelectConversation(conv)}
+                    onClick={() => {
+                      setActiveConversationId(conv.id)
+                      // In a real app, load conversation messages from DB
+                    }}
                     className={`group flex w-full items-start gap-3 rounded-lg p-3 text-left transition-all ${
                       activeConversationId === conv.id
                         ? "bg-uwazi-green/10 text-foreground"
@@ -422,145 +367,122 @@ function AskUwaziContent() {
               ) : (
                 /* Chat Messages */
                 <div className="space-y-8 pb-40">
-                  {messages.map((message, index) => (
-                    <div key={message.id} className="group animate-in fade-in slide-in-from-bottom-2 duration-300">
-                      {message.type === "user" ? (
-                        /* User Message */
-                        <div className="flex justify-end">
-                          <div className="max-w-[80%] rounded-2xl rounded-br-sm bg-uwazi-green px-5 py-3 text-black">
-                            <p className="whitespace-pre-wrap font-medium">{message.content}</p>
-                          </div>
-                        </div>
-                      ) : (
-                        /* Assistant Message */
-                        <div className="space-y-4">
-                          <div className="flex items-start gap-4">
-                            <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-uwazi-green/10 ring-1 ring-uwazi-green/20">
-                              <Sparkles className="h-5 w-5 text-uwazi-green" />
+                  {messages.map((message) => {
+                    const messageText = getMessageText(message)
+                    const isUser = message.role === "user"
+                    const parsed = !isUser ? parseResponse(messageText) : null
+
+                    return (
+                      <div key={message.id} className="group animate-in fade-in slide-in-from-bottom-2 duration-300">
+                        {isUser ? (
+                          /* User Message */
+                          <div className="flex justify-end">
+                            <div className="max-w-[80%] rounded-2xl rounded-br-sm bg-uwazi-green px-5 py-3 text-black">
+                              <p className="whitespace-pre-wrap font-medium">{messageText}</p>
                             </div>
-                            <div className="min-w-0 flex-1 space-y-4">
-                              {/* Quick Answer with streaming */}
-                              <StreamingText 
-                                text={message.answer?.quickAnswer || message.content}
-                                isStreaming={message.id === streamingMessageId}
-                              />
+                          </div>
+                        ) : (
+                          /* Assistant Message */
+                          <div className="space-y-4">
+                            <div className="flex items-start gap-4">
+                              <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-uwazi-green/10 ring-1 ring-uwazi-green/20">
+                                <Sparkles className="h-5 w-5 text-uwazi-green" />
+                              </div>
+                              <div className="min-w-0 flex-1 space-y-4">
+                                {/* Main response or Quick Answer */}
+                                {parsed?.hasStructure && parsed.sections.quickAnswer ? (
+                                  <div className="prose prose-invert prose-sm max-w-none">
+                                    <p className="text-foreground leading-relaxed whitespace-pre-wrap">
+                                      {parsed.sections.quickAnswer}
+                                    </p>
+                                  </div>
+                                ) : (
+                                  <div className="prose prose-invert prose-sm max-w-none">
+                                    <p className="text-foreground leading-relaxed whitespace-pre-wrap">
+                                      {messageText}
+                                    </p>
+                                  </div>
+                                )}
 
-                              {/* Modular Response Sections */}
-                              {message.id !== streamingMessageId && message.answer && (
-                                <div className="space-y-3 animate-in fade-in duration-500">
-                                  {/* In Plain English */}
-                                  {message.answer.plainEnglish && (
-                                    <CollapsibleSection icon={FileText} title="In Plain English">
-                                      <p className="text-sm leading-relaxed text-muted-foreground">
-                                        {message.answer.plainEnglish}
-                                      </p>
-                                    </CollapsibleSection>
-                                  )}
-
-                                  {/* Why This Matters */}
-                                  {message.answer.whyItMatters && (
-                                    <CollapsibleSection icon={Lightbulb} title="Why This Matters">
-                                      <p className="text-sm leading-relaxed text-muted-foreground">
-                                        {message.answer.whyItMatters}
-                                      </p>
-                                    </CollapsibleSection>
-                                  )}
-
-                                  {/* What You Can Do */}
-                                  {message.answer.whatYouCanDo && (
-                                    <CollapsibleSection icon={ChevronRight} title="What You Can Do" accentBorder>
-                                      <p className="text-sm leading-relaxed text-muted-foreground">
-                                        {message.answer.whatYouCanDo}
-                                      </p>
-                                    </CollapsibleSection>
-                                  )}
-
-                                  {/* Source Note */}
-                                  {message.answer.sourceNote && (
-                                    <div className="flex items-start gap-2 rounded-lg bg-secondary/30 px-3 py-2 text-xs text-muted-foreground">
-                                      <ExternalLink className="mt-0.5 h-3 w-3 flex-shrink-0" />
-                                      <span>{message.answer.sourceNote}</span>
-                                    </div>
-                                  )}
-
-                                  {/* Action Buttons */}
-                                  <div className="flex items-center gap-2 pt-1 opacity-0 transition-opacity group-hover:opacity-100">
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-8 gap-1.5 rounded-lg px-3 text-xs text-muted-foreground hover:bg-secondary hover:text-foreground"
-                                      onClick={() =>
-                                        handleCopy(
-                                          `${message.answer?.quickAnswer}\n\n${message.answer?.plainEnglish}`,
-                                          message.id
-                                        )
-                                      }
-                                    >
-                                      {copiedId === message.id ? (
-                                        <Check className="h-3.5 w-3.5 text-uwazi-green" />
-                                      ) : (
-                                        <Copy className="h-3.5 w-3.5" />
-                                      )}
-                                      {copiedId === message.id ? "Copied" : "Copy"}
-                                    </Button>
-                                    {user ? (
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className={`h-8 gap-1.5 rounded-lg px-3 text-xs ${
-                                          savedIds.has(message.id)
-                                            ? "text-uwazi-green"
-                                            : "text-muted-foreground hover:bg-secondary hover:text-foreground"
-                                        }`}
-                                        onClick={() => handleSave(message.id)}
-                                      >
-                                        <Bookmark
-                                          className={`h-3.5 w-3.5 ${savedIds.has(message.id) ? "fill-current" : ""}`}
-                                        />
-                                        {savedIds.has(message.id) ? "Saved" : "Save"}
-                                      </Button>
-                                    ) : (
-                                      <Link href="/login">
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          className="h-8 gap-1.5 rounded-lg px-3 text-xs text-muted-foreground hover:bg-secondary hover:text-foreground"
-                                        >
-                                          <Bookmark className="h-3.5 w-3.5" />
-                                          Save
-                                        </Button>
-                                      </Link>
+                                {/* Structured sections */}
+                                {parsed?.hasStructure && (
+                                  <div className="space-y-3">
+                                    {parsed.sections.plainEnglish && (
+                                      <ResponseSection 
+                                        icon={FileText} 
+                                        title="In Plain English" 
+                                        content={parsed.sections.plainEnglish} 
+                                      />
+                                    )}
+                                    {parsed.sections.whyItMatters && (
+                                      <ResponseSection 
+                                        icon={Lightbulb} 
+                                        title="Why This Matters" 
+                                        content={parsed.sections.whyItMatters} 
+                                      />
+                                    )}
+                                    {parsed.sections.whatYouCanDo && (
+                                      <ResponseSection 
+                                        icon={ChevronRight} 
+                                        title="What You Can Do" 
+                                        content={parsed.sections.whatYouCanDo}
+                                        accentBorder 
+                                      />
+                                    )}
+                                    {parsed.sections.sources && (
+                                      <div className="flex items-start gap-2 rounded-lg bg-secondary/30 px-3 py-2 text-xs text-muted-foreground">
+                                        <ExternalLink className="mt-0.5 h-3 w-3 flex-shrink-0" />
+                                        <span className="whitespace-pre-wrap">{parsed.sections.sources}</span>
+                                      </div>
                                     )}
                                   </div>
+                                )}
 
-                                  {/* Follow-up Suggestions */}
-                                  {index === messages.length - 1 && (
-                                    <div className="pt-4">
-                                      <p className="mb-2 text-xs font-medium text-muted-foreground">Continue exploring</p>
-                                      <div className="flex flex-wrap gap-2">
-                                        {followUpSuggestions.slice(0, 4).map((suggestion, i) => (
-                                          <button
-                                            key={i}
-                                            onClick={() => handlePromptClick(suggestion)}
-                                            className="rounded-full border border-border/50 bg-secondary/30 px-3 py-1.5 text-xs text-muted-foreground transition-all hover:border-uwazi-green/30 hover:bg-uwazi-green/10 hover:text-foreground"
-                                          >
-                                            {suggestion}
-                                          </button>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  )}
+                                {/* Action Buttons */}
+                                <div className="flex items-center gap-2 pt-1 opacity-0 transition-opacity group-hover:opacity-100">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 gap-1.5 rounded-lg px-3 text-xs text-muted-foreground hover:bg-secondary hover:text-foreground"
+                                    onClick={() => handleCopy(messageText, message.id)}
+                                  >
+                                    {copiedId === message.id ? (
+                                      <>
+                                        <Check className="h-3 w-3" />
+                                        Copied
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Copy className="h-3 w-3" />
+                                        Copy
+                                      </>
+                                    )}
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className={`h-8 gap-1.5 rounded-lg px-3 text-xs ${
+                                      savedIds.has(message.id)
+                                        ? "text-uwazi-green"
+                                        : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                                    }`}
+                                    onClick={() => handleSave(message.id)}
+                                    disabled={savedIds.has(message.id)}
+                                  >
+                                    <Bookmark className={`h-3 w-3 ${savedIds.has(message.id) ? "fill-current" : ""}`} />
+                                    {savedIds.has(message.id) ? "Saved" : "Save"}
+                                  </Button>
                                 </div>
-                              )}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                        )}
+                      </div>
+                    )
+                  })}
 
-                  {/* Thinking Indicator */}
-                  {isLoading && (
+                  {/* Loading indicator */}
+                  {isLoading && messages.length > 0 && messages[messages.length - 1]?.role === "user" && (
                     <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
                       <ThinkingIndicator />
                     </div>
@@ -573,61 +495,42 @@ function AskUwaziContent() {
           </div>
 
           {/* Input Area - Fixed at Bottom */}
-          <div className="sticky bottom-0 border-t border-border/30 bg-gradient-to-t from-background via-background to-background/80 backdrop-blur-xl">
+          <div className="sticky bottom-0 border-t border-border/50 bg-background/80 backdrop-blur-xl">
             <div className="mx-auto max-w-3xl px-4 py-4">
-              {/* Input Container */}
               <form onSubmit={handleSubmit} className="relative">
-                <div className="relative flex items-end rounded-2xl border border-border/50 bg-card shadow-2xl shadow-black/20 ring-1 ring-white/5 transition-all focus-within:border-uwazi-green/30 focus-within:ring-uwazi-green/10">
+                <div className="flex items-end gap-3 rounded-2xl border border-border/50 bg-card/50 p-3 shadow-lg ring-1 ring-border/10 transition-all focus-within:border-uwazi-green/30 focus-within:ring-uwazi-green/20">
                   <textarea
                     ref={textareaRef}
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
+                    value={inputValue}
+                    onChange={(e) => setInputValue(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    placeholder="Ask anything about laws, policies, voting, or your rights..."
+                    placeholder="Ask anything about laws, policies, or your civic rights..."
+                    className="max-h-[200px] min-h-[24px] flex-1 resize-none bg-transparent text-foreground placeholder:text-muted-foreground focus:outline-none"
                     rows={1}
-                    className="max-h-[200px] min-h-[60px] flex-1 resize-none bg-transparent px-5 py-4 pr-14 text-foreground placeholder:text-muted-foreground/60 focus:outline-none"
+                    disabled={isLoading}
                   />
-                  <div className="absolute bottom-3 right-3">
-                    <Button
-                      type="submit"
-                      size="icon"
-                      disabled={!input.trim() || isLoading}
-                      className="h-10 w-10 rounded-xl bg-uwazi-green text-black shadow-lg transition-all hover:bg-uwazi-green/90 hover:shadow-uwazi-green/20 hover:shadow-xl disabled:bg-secondary disabled:text-muted-foreground disabled:shadow-none"
-                    >
-                      {isLoading ? (
-                        <Loader2 className="h-5 w-5 animate-spin" />
-                      ) : (
-                        <ArrowUp className="h-5 w-5" />
-                      )}
-                    </Button>
-                  </div>
+                  <Button
+                    type="submit"
+                    size="icon"
+                    disabled={!inputValue.trim() || isLoading}
+                    className="h-10 w-10 flex-shrink-0 rounded-xl bg-uwazi-green text-black transition-all hover:bg-uwazi-green/90 disabled:opacity-50"
+                  >
+                    {isLoading ? (
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                    ) : (
+                      <ArrowUp className="h-5 w-5" />
+                    )}
+                  </Button>
                 </div>
               </form>
 
-              {/* Footer Note */}
-              <p className="mt-3 text-center text-xs text-muted-foreground/60">
-                Uwazi uses AI to simplify civic information. Always verify with official sources.
+              <p className="mt-3 text-center text-xs text-muted-foreground">
+                UWAZI provides educational information. Always verify with official sources for legal matters.
               </p>
             </div>
           </div>
         </main>
       </div>
-    </div>
-  )
-}
-
-// Streaming Text Component
-function StreamingText({ text, isStreaming }: { text: string; isStreaming: boolean }) {
-  const { displayedText, isComplete } = useStreamingText(text, isStreaming)
-
-  return (
-    <div>
-      <p className="text-base leading-relaxed text-foreground">
-        {displayedText}
-        {isStreaming && !isComplete && (
-          <span className="ml-0.5 inline-block h-4 w-0.5 animate-pulse bg-uwazi-green" />
-        )}
-      </p>
     </div>
   )
 }
