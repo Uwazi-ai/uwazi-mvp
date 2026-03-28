@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Navbar } from "@/components/navbar"
 import { Providers } from "@/components/providers"
 import { useAuth } from "@/lib/auth-context"
-import { examplePrompts, mockBills } from "@/lib/mock-data"
+import { examplePrompts } from "@/lib/mock-data"
 import { 
   Send, 
   Bookmark, 
@@ -358,8 +358,8 @@ function AskUwaziContent() {
                       <span>Updated daily</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <FileText className="h-4 w-4" />
-                      <span>{mockBills.length} bills tracked</span>
+                      <Scale className="h-4 w-4" />
+                      <span>Non-partisan answers</span>
                     </div>
                   </div>
                 </div>
