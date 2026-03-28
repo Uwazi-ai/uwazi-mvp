@@ -1,8 +1,3 @@
-import { dirname } from 'path'
-import { fileURLToPath } from 'url'
-
-const __dirname = dirname(fileURLToPath(import.meta.url))
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   typescript: {
@@ -12,7 +7,7 @@ const nextConfig = {
     unoptimized: true,
   },
   turbopack: {
-    root: __dirname,
+    root: '/vercel/share/v0-project',
   },
 }
 
