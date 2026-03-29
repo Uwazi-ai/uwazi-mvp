@@ -91,6 +91,16 @@ export {
   getRaiaPredictionFormat,
 } from "./schemas"
 
+// Re-export civic data layer
+export {
+  STATE_CIVIC_DATA,
+  getStateElectionData,
+  getUpcomingDeadlines,
+  buildCivicDataContext,
+  getAvailableStates,
+} from "./civic-data"
+export type { StateElectionData } from "./civic-data"
+
 // =============================================================================
 // Orchestrator — Request Classification
 // =============================================================================

@@ -8,6 +8,7 @@ import {
   buildMessages,
   needsPredictionLayer,
   getRaiaResponseFormat,
+  buildCivicDataContext,
 } from "@/lib/raia"
 import type { RaiaAskRequest } from "@/lib/raia"
 
@@ -52,7 +53,13 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // Step 3: Build three-layer prompt architecture
+    // Step 3: Retrieve civic data if jurisdiction is resolved
+    let civicDataContext: string | null = null
+    if (classified.jurisdiction?.state) {
+      civicDataContext = buildCivicDataContext(classified.jurisdiction.state)
+    }
+
+    // Step 4: Build three-layer prompt architecture
     //   Layer 1 — System prompt: Raia identity and principles (stable)
     const systemPrompt = RAIA_SYSTEM_PROMPT
 
@@ -75,13 +82,18 @@ export async function POST(req: NextRequest) {
       developerPrompt += `\nSafety Flags: ${classified.safety_flags.join(", ")}`
     }
 
+    // Inject retrieved civic data as grounding context
+    if (civicDataContext) {
+      developerPrompt += `\n\n${civicDataContext}`
+    }
+
     //   Layer 3 — User input: the actual question
     const userInput = question
 
     // Assemble message array
     const messages = buildMessages(systemPrompt, developerPrompt, userInput)
 
-    // Step 4: Call the model with structured output
+    // Step 5: Call the model with structured output
     const response = await client.responses.create({
       model: "gpt-4.1-mini",
       input: messages,
@@ -92,7 +104,7 @@ export async function POST(req: NextRequest) {
 
     const parsed = JSON.parse(response.output_text)
 
-    // Step 5: Build response with backward compatibility for existing frontend
+    // Step 6: Build response with backward compatibility for existing frontend
     const legacyResponse = {
       quickAnswer: parsed.quick_answer,
       plainEnglish: parsed.plain_english,
@@ -101,7 +113,7 @@ export async function POST(req: NextRequest) {
       sourceNote: parsed.source_note,
     }
 
-    // Step 6: Include Raia metadata for enhanced clients
+    // Step 7: Include Raia metadata for enhanced clients
     const raiaMetadata = {
       question_type: parsed.question_type,
       jurisdiction: parsed.jurisdiction,
