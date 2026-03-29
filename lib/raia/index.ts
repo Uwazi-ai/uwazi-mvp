@@ -73,11 +73,13 @@ export {
   getInterventionCatalog,
 } from "./interventions"
 
-// Re-export system prompt
+// Re-export prompt architecture
 export {
   RAIA_SYSTEM_PROMPT,
-  RAIA_PREDICTION_PROMPT,
-  buildSystemPrompt,
+  RAIA_DEV_PROMPT,
+  RAIA_PREDICTION_DEV_PROMPT,
+  buildDevPrompt,
+  buildMessages,
   needsPredictionLayer,
 } from "./system-prompt"
 

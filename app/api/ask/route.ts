@@ -3,7 +3,9 @@ import OpenAI from "openai"
 import {
   classifyQuestion,
   evaluateSafety,
-  buildSystemPrompt,
+  RAIA_SYSTEM_PROMPT,
+  buildDevPrompt,
+  buildMessages,
   needsPredictionLayer,
   getRaiaResponseFormat,
 } from "@/lib/raia"
@@ -30,7 +32,7 @@ export async function POST(req: NextRequest) {
     const raiaRequest: RaiaAskRequest = { question, jurisdiction }
     const classified = classifyQuestion(raiaRequest)
 
-    // Step 2: Safety check
+    // Step 2: Safety check — refuse before calling the model
     const safetyDecision = evaluateSafety(classified.safety_flags)
 
     if (safetyDecision.action === "refuse") {
@@ -50,9 +52,13 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // Step 3: Build system prompt with appropriate layers
-    const systemPrompt = buildSystemPrompt({
-      include_prediction_layer: needsPredictionLayer(classified.question_type),
+    // Step 3: Build three-layer prompt architecture
+    //   Layer 1 — System prompt: Raia identity and principles (stable)
+    const systemPrompt = RAIA_SYSTEM_PROMPT
+
+    //   Layer 2 — Developer prompt: execution rules + dynamic context + intent
+    let developerPrompt = buildDevPrompt({
+      prediction_mode: needsPredictionLayer(classified.question_type),
       jurisdiction_context: classified.jurisdiction
         ? `User jurisdiction: ${JSON.stringify(classified.jurisdiction)}`
         : classified.jurisdiction_required
@@ -61,13 +67,24 @@ export async function POST(req: NextRequest) {
       time_context: `Current date: ${new Date().toISOString().split("T")[0]}. Time sensitivity: ${classified.time_sensitivity}.`,
     })
 
+    // Inject classified intent so the model knows how to route
+    developerPrompt += `\nIntent: ${classified.question_type}`
+    developerPrompt += `\nTime Sensitivity: ${classified.time_sensitivity}`
+    developerPrompt += `\nSources Needed: ${classified.sources_needed.join(", ") || "none"}`
+    if (classified.safety_flags.length > 0) {
+      developerPrompt += `\nSafety Flags: ${classified.safety_flags.join(", ")}`
+    }
+
+    //   Layer 3 — User input: the actual question
+    const userInput = question
+
+    // Assemble message array
+    const messages = buildMessages(systemPrompt, developerPrompt, userInput)
+
     // Step 4: Call the model with structured output
     const response = await client.responses.create({
       model: "gpt-4.1-mini",
-      input: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: question },
-      ],
+      input: messages,
       text: {
         format: getRaiaResponseFormat(),
       },

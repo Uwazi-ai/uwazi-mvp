@@ -3,7 +3,9 @@ import OpenAI from "openai"
 import {
   validatePredictionRequest,
   buildPredictionPromptContext,
-  buildSystemPrompt,
+  RAIA_SYSTEM_PROMPT,
+  buildDevPrompt,
+  buildMessages,
   getRaiaPredictionFormat,
 } from "@/lib/raia"
 import type { RaiaPredictionRequest } from "@/lib/raia"
@@ -25,23 +27,31 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Build the prediction-specific system prompt
-    const systemPrompt = buildSystemPrompt({
-      include_prediction_layer: true,
+    // Three-layer prompt architecture
+
+    // Layer 1 — System prompt: Raia identity (stable)
+    const systemPrompt = RAIA_SYSTEM_PROMPT
+
+    // Layer 2 — Developer prompt: prediction execution rules + context + intent
+    let developerPrompt = buildDevPrompt({
+      prediction_mode: true,
       jurisdiction_context: `Target jurisdiction: ${JSON.stringify(body.jurisdiction)}`,
       time_context: `Current date: ${new Date().toISOString().split("T")[0]}. Time horizon: ${body.time_horizon ?? "current cycle"}.`,
     })
 
-    // Build the prediction context as the user message
-    const predictionContext = buildPredictionPromptContext(body)
+    developerPrompt += `\nIntent: prediction_request`
+    developerPrompt += `\nPrediction Class: ${body.prediction_class}`
+
+    // Layer 3 — User input: the prediction task context
+    const userInput = buildPredictionPromptContext(body)
+
+    // Assemble message array
+    const messages = buildMessages(systemPrompt, developerPrompt, userInput)
 
     // Call the model with structured prediction output
     const response = await client.responses.create({
       model: "gpt-4.1-mini",
-      input: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: predictionContext },
-      ],
+      input: messages,
       text: {
         format: getRaiaPredictionFormat(),
       },
