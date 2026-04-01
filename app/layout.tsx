@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from 'next'
-import { Inter, Geist_Mono } from 'next/font/google'
-import localFont from 'next/font/local'
+import { Inter, Geist_Mono, Oswald } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
 
@@ -16,11 +15,11 @@ const geistMono = Geist_Mono({
   display: 'swap',
 })
 
-const axisFont = localFont({
-  src: './fonts/Axis-Extrabold.otf',
+const axisDisplay = Oswald({
+  subsets: ['latin'],
   variable: '--font-axis',
   display: 'swap',
-  weight: '800',
+  weight: ['700'],
 })
 
 export const metadata: Metadata = {
@@ -59,7 +58,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark">
-      <body className={`${inter.variable} ${geistMono.variable} ${axisFont.variable} font-sans antialiased`}>
+      <body className={`${inter.variable} ${geistMono.variable} ${axisDisplay.variable} font-sans antialiased`}>
         {children}
         <Analytics />
       </body>
