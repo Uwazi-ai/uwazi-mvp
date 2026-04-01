@@ -1,9 +1,11 @@
 import { createClient } from "@supabase/supabase-js"
 
 // Create a Supabase client with service role key for server-side access
+// Updated to use Supabase instead of Neon - all queries use Supabase query builder
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
+// Export supabase client for direct use if needed
 export const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
 // Bill type matching our database schema
