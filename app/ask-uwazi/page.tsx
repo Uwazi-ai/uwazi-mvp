@@ -1,5 +1,4 @@
-import { auth } from "@/auth"
-import AskUwaziClient from "./AskUwaziClient"
+"use client"
 
 import { useState, useRef, useEffect } from "react"
 import { useChat } from "@ai-sdk/react"
@@ -9,10 +8,10 @@ import { Navbar } from "@/components/navbar"
 import { Providers } from "@/components/providers"
 import { useAuth } from "@/lib/auth-context"
 import { examplePrompts } from "@/lib/mock-data"
-import { 
-  Send, 
-  Bookmark, 
-  Sparkles, 
+import {
+  Send,
+  Bookmark,
+  Sparkles,
   ArrowUp,
   Copy,
   Check,
@@ -76,7 +75,6 @@ function parseResponse(text: string) {
     sources?: string
   } = {}
 
-  // Try to extract structured sections
   const quickAnswerMatch = text.match(/\*\*Quick Answer:\*\*\s*([\s\S]*?)(?=\*\*In Plain English:\*\*|\*\*Why This Matters:\*\*|\*\*What You Can Do:\*\*|\*\*Sources:\*\*|$)/i)
   const plainEnglishMatch = text.match(/\*\*In Plain English:\*\*\s*([\s\S]*?)(?=\*\*Why This Matters:\*\*|\*\*What You Can Do:\*\*|\*\*Sources:\*\*|$)/i)
   const whyItMattersMatch = text.match(/\*\*Why This Matters:\*\*\s*([\s\S]*?)(?=\*\*What You Can Do:\*\*|\*\*Sources:\*\*|$)/i)
@@ -89,30 +87,30 @@ function parseResponse(text: string) {
   if (whatYouCanDoMatch) sections.whatYouCanDo = whatYouCanDoMatch[1].trim()
   if (sourcesMatch) sections.sources = sourcesMatch[1].trim()
 
-  // If no structured sections found, treat the whole thing as the answer
   const hasStructure = Object.keys(sections).length > 0
-  
   return { sections, hasStructure, fullText: text }
 }
 
 // Response section component
-function ResponseSection({ 
-  icon: Icon, 
-  title, 
+function ResponseSection({
+  icon: Icon,
+  title,
   content,
-  accentBorder = false
-}: { 
+  accentBorder = false,
+}: {
   icon: React.ElementType
   title: string
   content: string
   accentBorder?: boolean
 }) {
   return (
-    <div className={`rounded-xl border p-4 transition-all ${
-      accentBorder 
-        ? "border-uwazi-green/30 bg-uwazi-green/5" 
-        : "border-border/50 bg-secondary/20"
-    }`}>
+    <div
+      className={`rounded-xl border p-4 transition-all ${
+        accentBorder
+          ? "border-uwazi-green/30 bg-uwazi-green/5"
+          : "border-border/50 bg-secondary/20"
+      }`}
+    >
       <div className="flex items-center gap-2 text-sm font-medium text-uwazi-green mb-2">
         <Icon className="h-4 w-4" />
         {title}
@@ -135,7 +133,6 @@ function AskUwaziContent() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  // AI SDK useChat hook
   const { messages, sendMessage, status, setMessages } = useChat({
     transport: new DefaultChatTransport({ api: "/api/chat" }),
   })
@@ -160,11 +157,8 @@ function AskUwaziContent() {
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault()
     if (!inputValue.trim() || isLoading) return
-
     const userInput = inputValue.trim()
     setInputValue("")
-
-    // Create new conversation if none active
     if (!activeConversationId) {
       const newConversation: Conversation = {
         id: Date.now().toString(),
@@ -172,28 +166,22 @@ function AskUwaziContent() {
         preview: userInput,
         timestamp: new Date(),
       }
-      setConversations(prev => [newConversation, ...prev])
+      setConversations((prev) => [newConversation, ...prev])
       setActiveConversationId(newConversation.id)
     }
-
-    // Send message using AI SDK
     sendMessage({ text: userInput })
   }
 
   const handlePromptClick = (prompt: string) => {
     if (isLoading) return
-    
-    // Create new conversation
     const newConversation: Conversation = {
       id: Date.now().toString(),
       title: prompt.slice(0, 40) + (prompt.length > 40 ? "..." : ""),
       preview: prompt,
       timestamp: new Date(),
     }
-    setConversations(prev => [newConversation, ...prev])
+    setConversations((prev) => [newConversation, ...prev])
     setActiveConversationId(newConversation.id)
-    
-    // Send message directly
     sendMessage({ text: prompt })
   }
 
@@ -224,16 +212,16 @@ function AskUwaziContent() {
   const trackedBillsCount = 2
 
   return (
-<div className="flex min-h-screen flex-col bg-background">
+    <div className="flex min-h-screen flex-col bg-background">
       <Navbar />
-
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
-        <aside className={`${
-          sidebarOpen ? "w-72" : "w-0"
-        } flex-shrink-0 border-r border-border/50 bg-card/30 transition-all duration-300 overflow-hidden`}>
+        <aside
+          className={`${
+            sidebarOpen ? "w-72" : "w-0"
+          } flex-shrink-0 border-r border-border/50 bg-card/30 transition-all duration-300 overflow-hidden`}
+        >
           <div className="flex h-full w-72 flex-col">
-            {/* Sidebar Header */}
             <div className="flex items-center justify-between border-b border-border/50 p-4">
               <span className="text-sm font-medium text-foreground">Conversations</span>
               <Button
@@ -245,17 +233,12 @@ function AskUwaziContent() {
                 <Plus className="h-4 w-4" />
               </Button>
             </div>
-
-            {/* Conversation List */}
             <div className="flex-1 overflow-y-auto p-2">
               <div className="space-y-1">
                 {conversations.map((conv) => (
                   <button
                     key={conv.id}
-                    onClick={() => {
-                      setActiveConversationId(conv.id)
-                      // In a real app, load conversation messages from DB
-                    }}
+                    onClick={() => setActiveConversationId(conv.id)}
                     className={`group flex w-full items-start gap-3 rounded-lg p-3 text-left transition-all ${
                       activeConversationId === conv.id
                         ? "bg-uwazi-green/10 text-foreground"
@@ -271,10 +254,11 @@ function AskUwaziContent() {
                 ))}
               </div>
             </div>
-
-            {/* Sidebar Footer - Tracked & Saved */}
             <div className="border-t border-border/50 p-3 space-y-2">
-              <Link href="/legislation-tracker" className="flex items-center gap-3 rounded-lg p-2 text-muted-foreground transition-colors hover:bg-secondary/50 hover:text-foreground">
+              <Link
+                href="/legislation-tracker"
+                className="flex items-center gap-3 rounded-lg p-2 text-muted-foreground transition-colors hover:bg-secondary/50 hover:text-foreground"
+              >
                 <Bell className="h-4 w-4" />
                 <span className="flex-1 text-sm">Tracked Bills</span>
                 {trackedBillsCount > 0 && (
@@ -283,7 +267,10 @@ function AskUwaziContent() {
                   </span>
                 )}
               </Link>
-              <Link href="/account" className="flex items-center gap-3 rounded-lg p-2 text-muted-foreground transition-colors hover:bg-secondary/50 hover:text-foreground">
+              <Link
+                href="/account"
+                className="flex items-center gap-3 rounded-lg p-2 text-muted-foreground transition-colors hover:bg-secondary/50 hover:text-foreground"
+              >
                 <Bookmark className="h-4 w-4" />
                 <span className="flex-1 text-sm">Saved Questions</span>
               </Link>
@@ -293,7 +280,6 @@ function AskUwaziContent() {
 
         {/* Main Content */}
         <main className="flex flex-1 flex-col overflow-hidden">
-          {/* Toggle Sidebar Button */}
           <div className="absolute left-0 top-20 z-10 p-2">
             <Button
               variant="ghost"
@@ -307,11 +293,9 @@ function AskUwaziContent() {
             </Button>
           </div>
 
-          {/* Messages Area */}
           <div className="flex-1 overflow-y-auto">
             <div className="mx-auto max-w-3xl px-4 py-8">
               {isEmpty ? (
-                /* Empty State - Centered Hero */
                 <div className="flex min-h-[60vh] flex-col items-center justify-center">
                   <div className="relative mb-4">
                     <div className="absolute -inset-4 rounded-full bg-uwazi-green/10 blur-2xl" />
@@ -325,8 +309,6 @@ function AskUwaziContent() {
                   <p className="mt-4 max-w-lg text-center text-lg text-muted-foreground">
                     Ask anything about laws, policies, voting, or your rights. Get clear answers in plain English.
                   </p>
-
-                  {/* Suggested Prompts Grid */}
                   <div className="mt-12 grid w-full max-w-2xl gap-3 sm:grid-cols-2">
                     {examplePrompts.map((prompt, index) => {
                       const icons = [Scale, FileText, MessageSquare, Lightbulb]
@@ -351,8 +333,6 @@ function AskUwaziContent() {
                       )
                     })}
                   </div>
-
-                  {/* Quick Stats */}
                   <div className="mt-16 flex items-center gap-8 text-sm text-muted-foreground">
                     <div className="flex items-center gap-2">
                       <Clock className="h-4 w-4" />
@@ -365,31 +345,26 @@ function AskUwaziContent() {
                   </div>
                 </div>
               ) : (
-                /* Chat Messages */
                 <div className="space-y-8 pb-40">
                   {messages.map((message) => {
                     const messageText = getMessageText(message)
                     const isUser = message.role === "user"
                     const parsed = !isUser ? parseResponse(messageText) : null
-
                     return (
                       <div key={message.id} className="group animate-in fade-in slide-in-from-bottom-2 duration-300">
                         {isUser ? (
-                          /* User Message */
                           <div className="flex justify-end">
                             <div className="max-w-[80%] rounded-2xl rounded-br-sm bg-uwazi-green px-5 py-3 text-black">
                               <p className="whitespace-pre-wrap font-medium">{messageText}</p>
                             </div>
                           </div>
                         ) : (
-                          /* Assistant Message */
                           <div className="space-y-4">
                             <div className="flex items-start gap-4">
                               <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-uwazi-green/10 ring-1 ring-uwazi-green/20">
                                 <Sparkles className="h-5 w-5 text-uwazi-green" />
                               </div>
                               <div className="min-w-0 flex-1 space-y-4">
-                                {/* Main response or Quick Answer */}
                                 {parsed?.hasStructure && parsed.sections.quickAnswer ? (
                                   <div className="prose prose-invert prose-sm max-w-none">
                                     <p className="text-foreground leading-relaxed whitespace-pre-wrap">
@@ -403,31 +378,16 @@ function AskUwaziContent() {
                                     </p>
                                   </div>
                                 )}
-
-                                {/* Structured sections */}
                                 {parsed?.hasStructure && (
                                   <div className="space-y-3">
                                     {parsed.sections.plainEnglish && (
-                                      <ResponseSection 
-                                        icon={FileText} 
-                                        title="In Plain English" 
-                                        content={parsed.sections.plainEnglish} 
-                                      />
+                                      <ResponseSection icon={FileText} title="In Plain English" content={parsed.sections.plainEnglish} />
                                     )}
                                     {parsed.sections.whyItMatters && (
-                                      <ResponseSection 
-                                        icon={Lightbulb} 
-                                        title="Why This Matters" 
-                                        content={parsed.sections.whyItMatters} 
-                                      />
+                                      <ResponseSection icon={Lightbulb} title="Why This Matters" content={parsed.sections.whyItMatters} />
                                     )}
                                     {parsed.sections.whatYouCanDo && (
-                                      <ResponseSection 
-                                        icon={ChevronRight} 
-                                        title="What You Can Do" 
-                                        content={parsed.sections.whatYouCanDo}
-                                        accentBorder 
-                                      />
+                                      <ResponseSection icon={ChevronRight} title="What You Can Do" content={parsed.sections.whatYouCanDo} accentBorder />
                                     )}
                                     {parsed.sections.sources && (
                                       <div className="flex items-start gap-2 rounded-lg bg-secondary/30 px-3 py-2 text-xs text-muted-foreground">
@@ -437,8 +397,6 @@ function AskUwaziContent() {
                                     )}
                                   </div>
                                 )}
-
-                                {/* Action Buttons */}
                                 <div className="flex items-center gap-2 pt-1 opacity-0 transition-opacity group-hover:opacity-100">
                                   <Button
                                     variant="ghost"
@@ -447,15 +405,9 @@ function AskUwaziContent() {
                                     onClick={() => handleCopy(messageText, message.id)}
                                   >
                                     {copiedId === message.id ? (
-                                      <>
-                                        <Check className="h-3 w-3" />
-                                        Copied
-                                      </>
+                                      <><Check className="h-3 w-3" /> Copied</>
                                     ) : (
-                                      <>
-                                        <Copy className="h-3 w-3" />
-                                        Copy
-                                      </>
+                                      <><Copy className="h-3 w-3" /> Copy</>
                                     )}
                                   </Button>
                                   <Button
@@ -480,21 +432,18 @@ function AskUwaziContent() {
                       </div>
                     )
                   })}
-
-                  {/* Loading indicator */}
                   {isLoading && messages.length > 0 && messages[messages.length - 1]?.role === "user" && (
                     <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
                       <ThinkingIndicator />
                     </div>
                   )}
-
                   <div ref={messagesEndRef} />
                 </div>
               )}
             </div>
           </div>
 
-          {/* Input Area - Fixed at Bottom */}
+          {/* Input Area */}
           <div className="sticky bottom-0 border-t border-border/50 bg-background/80 backdrop-blur-xl">
             <div className="mx-auto max-w-3xl px-4 py-4">
               <form onSubmit={handleSubmit} className="relative">
@@ -523,7 +472,6 @@ function AskUwaziContent() {
                   </Button>
                 </div>
               </form>
-
               <p className="mt-3 text-center text-xs text-muted-foreground">
                 UWAZI provides educational information. Always verify with official sources for legal matters.
               </p>
@@ -535,8 +483,10 @@ function AskUwaziContent() {
   )
 }
 
-        <AskUwaziClient isLoggedIn={!!session?.user?.email} />
-      </div>
-    </main>
+export default function AskUwaziPage() {
+  return (
+    <Providers>
+      <AskUwaziContent />
+    </Providers>
   )
 }
