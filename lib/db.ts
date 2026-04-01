@@ -36,42 +36,65 @@ export async function getBills(filters?: {
 }): Promise<DBBill[]> {
   const { level, state, status, search, limit = 50, offset = 0 } = filters || {}
 
-  // Build dynamic query using sql.query() for parameterized queries
-  let query = `SELECT * FROM bills WHERE 1=1`
-  const params: (string | number)[] = []
-  let paramIndex = 1
-
-  if (level) {
-    query += ` AND level = $${paramIndex}`
-    params.push(level)
-    paramIndex++
+  // Use different queries based on filters to work with tagged template literal
+  // When no filters, get all bills
+  if (!level && !state && !status && !search) {
+    const result = await sql`
+      SELECT * FROM bills 
+      ORDER BY COALESCE(last_action_date, introduced_date, created_at) DESC
+      LIMIT ${limit} OFFSET ${offset}
+    `
+    return result as DBBill[]
   }
 
-  if (state) {
-    query += ` AND state = $${paramIndex}`
-    params.push(state)
-    paramIndex++
+  // With level filter only
+  if (level && !state && !status && !search) {
+    const result = await sql`
+      SELECT * FROM bills 
+      WHERE level = ${level}
+      ORDER BY COALESCE(last_action_date, introduced_date, created_at) DESC
+      LIMIT ${limit} OFFSET ${offset}
+    `
+    return result as DBBill[]
   }
 
-  if (status) {
-    query += ` AND status ILIKE $${paramIndex}`
-    params.push(`%${status}%`)
-    paramIndex++
+  // With state filter
+  if (state && !status && !search) {
+    const result = await sql`
+      SELECT * FROM bills 
+      WHERE state = ${state}
+      ${level ? sql`AND level = ${level}` : sql``}
+      ORDER BY COALESCE(last_action_date, introduced_date, created_at) DESC
+      LIMIT ${limit} OFFSET ${offset}
+    `
+    return result as DBBill[]
   }
 
+  // With search filter
   if (search) {
-    query += ` AND (title ILIKE $${paramIndex} OR summary ILIKE $${paramIndex})`
-    params.push(`%${search}%`)
-    paramIndex++
+    const searchPattern = `%${search}%`
+    const result = await sql`
+      SELECT * FROM bills 
+      WHERE (title ILIKE ${searchPattern} OR summary ILIKE ${searchPattern})
+      ${level ? sql`AND level = ${level}` : sql``}
+      ${state ? sql`AND state = ${state}` : sql``}
+      ORDER BY COALESCE(last_action_date, introduced_date, created_at) DESC
+      LIMIT ${limit} OFFSET ${offset}
+    `
+    return result as DBBill[]
   }
 
-  query += ` ORDER BY COALESCE(last_action_date, introduced_date, created_at) DESC`
-  query += ` LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`
-  params.push(limit, offset)
-
-  // Use sql.query() for dynamic parameterized queries
-  const result = await sql.query(query, params)
-  return result.rows as DBBill[]
+  // Default: get all with any combination of filters
+  const result = await sql`
+    SELECT * FROM bills 
+    WHERE 1=1
+    ${level ? sql`AND level = ${level}` : sql``}
+    ${state ? sql`AND state = ${state}` : sql``}
+    ${status ? sql`AND status ILIKE ${`%${status}%`}` : sql``}
+    ORDER BY COALESCE(last_action_date, introduced_date, created_at) DESC
+    LIMIT ${limit} OFFSET ${offset}
+  `
+  return result as DBBill[]
 }
 
 // Get a single bill by ID
