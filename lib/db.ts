@@ -1,8 +1,10 @@
-import { neon } from "@neondatabase/serverless"
+import { createClient } from "@supabase/supabase-js"
 
-// Create a reusable SQL client - using tagged template literal syntax
-const sql = neon(process.env.DATABASE_URL!)
-export { sql }
+// Create a Supabase client with service role key for server-side access
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+
+export const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
 // Bill type matching our database schema
 export interface DBBill {
@@ -37,77 +39,75 @@ export async function getBills(filters?: {
 }): Promise<DBBill[]> {
   const { level, state, status, search, limit = 50, offset = 0 } = filters || {}
 
-  // Use different queries based on filters to work with tagged template literal
-  // When no filters, get all bills
-  if (!level && !state && !status && !search) {
-    const result = await sql`
-      SELECT * FROM bills 
-      ORDER BY COALESCE(last_action_date, introduced_date, created_at) DESC
-      LIMIT ${limit} OFFSET ${offset}
-    `
-    return result as DBBill[]
+  let query = supabase
+    .from("bills")
+    .select("*")
+    .order("last_action_date", { ascending: false, nullsFirst: false })
+    .range(offset, offset + limit - 1)
+
+  if (level) {
+    query = query.eq("level", level)
   }
 
-  // With level filter only
-  if (level && !state && !status && !search) {
-    const result = await sql`
-      SELECT * FROM bills 
-      WHERE level = ${level}
-      ORDER BY COALESCE(last_action_date, introduced_date, created_at) DESC
-      LIMIT ${limit} OFFSET ${offset}
-    `
-    return result as DBBill[]
+  if (state) {
+    query = query.eq("state", state)
   }
 
-  // With state filter
-  if (state && !status && !search) {
-    const result = await sql`
-      SELECT * FROM bills 
-      WHERE state = ${state}
-      ${level ? sql`AND level = ${level}` : sql``}
-      ORDER BY COALESCE(last_action_date, introduced_date, created_at) DESC
-      LIMIT ${limit} OFFSET ${offset}
-    `
-    return result as DBBill[]
+  if (status) {
+    query = query.ilike("status", `%${status}%`)
   }
 
-  // With search filter
   if (search) {
-    const searchPattern = `%${search}%`
-    const result = await sql`
-      SELECT * FROM bills 
-      WHERE (title ILIKE ${searchPattern} OR summary ILIKE ${searchPattern})
-      ${level ? sql`AND level = ${level}` : sql``}
-      ${state ? sql`AND state = ${state}` : sql``}
-      ORDER BY COALESCE(last_action_date, introduced_date, created_at) DESC
-      LIMIT ${limit} OFFSET ${offset}
-    `
-    return result as DBBill[]
+    query = query.or(`title.ilike.%${search}%,summary.ilike.%${search}%`)
   }
 
-  // Default: get all with any combination of filters
-  const result = await sql`
-    SELECT * FROM bills 
-    WHERE 1=1
-    ${level ? sql`AND level = ${level}` : sql``}
-    ${state ? sql`AND state = ${state}` : sql``}
-    ${status ? sql`AND status ILIKE ${`%${status}%`}` : sql``}
-    ORDER BY COALESCE(last_action_date, introduced_date, created_at) DESC
-    LIMIT ${limit} OFFSET ${offset}
-  `
-  return result as DBBill[]
+  const { data, error } = await query
+
+  if (error) {
+    console.error("[v0] Error fetching bills:", error)
+    throw error
+  }
+
+  return (data || []) as DBBill[]
 }
 
 // Get a single bill by ID
 export async function getBillById(id: string): Promise<DBBill | null> {
-  const result = await sql`SELECT * FROM bills WHERE id = ${id} LIMIT 1`
-  return (result[0] as DBBill) || null
+  const { data, error } = await supabase
+    .from("bills")
+    .select("*")
+    .eq("id", id)
+    .single()
+
+  if (error) {
+    if (error.code === "PGRST116") {
+      // No rows returned
+      return null
+    }
+    console.error("[v0] Error fetching bill by ID:", error)
+    throw error
+  }
+
+  return data as DBBill
 }
 
 // Get bill by external bill_id
 export async function getBillByBillId(billId: string): Promise<DBBill | null> {
-  const result = await sql`SELECT * FROM bills WHERE bill_id = ${billId} LIMIT 1`
-  return (result[0] as DBBill) || null
+  const { data, error } = await supabase
+    .from("bills")
+    .select("*")
+    .eq("bill_id", billId)
+    .single()
+
+  if (error) {
+    if (error.code === "PGRST116") {
+      return null
+    }
+    console.error("[v0] Error fetching bill by bill_id:", error)
+    throw error
+  }
+
+  return data as DBBill
 }
 
 // Upsert bills (insert or update on conflict)
@@ -116,42 +116,35 @@ export async function upsertBills(bills: Omit<DBBill, "id" | "created_at" | "upd
 
   for (const bill of bills) {
     try {
-      await sql`
-        INSERT INTO bills (
-          bill_id, title, summary, status, level, state, chamber,
-          introduced_date, last_action, last_action_date, sponsor,
-          topics, url, source, raw_data, updated_at
-        ) VALUES (
-          ${bill.bill_id},
-          ${bill.title},
-          ${bill.summary},
-          ${bill.status},
-          ${bill.level},
-          ${bill.state},
-          ${bill.chamber},
-          ${bill.introduced_date},
-          ${bill.last_action},
-          ${bill.last_action_date},
-          ${bill.sponsor},
-          ${bill.topics},
-          ${bill.url},
-          ${bill.source},
-          ${JSON.stringify(bill.raw_data)},
-          NOW()
+      const { error } = await supabase
+        .from("bills")
+        .upsert(
+          {
+            bill_id: bill.bill_id,
+            title: bill.title,
+            summary: bill.summary,
+            status: bill.status,
+            level: bill.level,
+            state: bill.state,
+            chamber: bill.chamber,
+            introduced_date: bill.introduced_date,
+            last_action: bill.last_action,
+            last_action_date: bill.last_action_date,
+            sponsor: bill.sponsor,
+            topics: bill.topics,
+            url: bill.url,
+            source: bill.source,
+            raw_data: bill.raw_data,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "bill_id" }
         )
-        ON CONFLICT (bill_id) DO UPDATE SET
-          title = EXCLUDED.title,
-          summary = EXCLUDED.summary,
-          status = EXCLUDED.status,
-          last_action = EXCLUDED.last_action,
-          last_action_date = EXCLUDED.last_action_date,
-          sponsor = EXCLUDED.sponsor,
-          topics = EXCLUDED.topics,
-          url = EXCLUDED.url,
-          raw_data = EXCLUDED.raw_data,
-          updated_at = NOW()
-      `
-      upsertedCount++
+
+      if (error) {
+        console.error(`[v0] Error upserting bill ${bill.bill_id}:`, error)
+      } else {
+        upsertedCount++
+      }
     } catch (error) {
       console.error(`[v0] Error upserting bill ${bill.bill_id}:`, error)
     }
@@ -162,19 +155,33 @@ export async function upsertBills(bills: Omit<DBBill, "id" | "created_at" | "upd
 
 // Get bill count by level
 export async function getBillCounts(): Promise<{ federal: number; state: number; local: number; total: number }> {
-  const result = await sql`
-    SELECT 
-      COUNT(*) FILTER (WHERE level = 'federal') as federal,
-      COUNT(*) FILTER (WHERE level = 'state') as state,
-      COUNT(*) FILTER (WHERE level = 'local') as local,
-      COUNT(*) as total
-    FROM bills
-  `
-  const counts = result[0] as { federal: string; state: string; local: string; total: string }
+  const { count: total, error: totalError } = await supabase
+    .from("bills")
+    .select("*", { count: "exact", head: true })
+
+  const { count: federal, error: federalError } = await supabase
+    .from("bills")
+    .select("*", { count: "exact", head: true })
+    .eq("level", "federal")
+
+  const { count: state, error: stateError } = await supabase
+    .from("bills")
+    .select("*", { count: "exact", head: true })
+    .eq("level", "state")
+
+  const { count: local, error: localError } = await supabase
+    .from("bills")
+    .select("*", { count: "exact", head: true })
+    .eq("level", "local")
+
+  if (totalError || federalError || stateError || localError) {
+    console.error("[v0] Error getting bill counts")
+  }
+
   return {
-    federal: parseInt(counts.federal) || 0,
-    state: parseInt(counts.state) || 0,
-    local: parseInt(counts.local) || 0,
-    total: parseInt(counts.total) || 0,
+    federal: federal || 0,
+    state: state || 0,
+    local: local || 0,
+    total: total || 0,
   }
 }
