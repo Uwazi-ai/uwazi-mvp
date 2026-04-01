@@ -1,7 +1,8 @@
 import { neon } from "@neondatabase/serverless"
 
-// Create a reusable SQL client
-export const sql = neon(process.env.DATABASE_URL!)
+// Create a reusable SQL client - using tagged template literal syntax
+const sql = neon(process.env.DATABASE_URL!)
+export { sql }
 
 // Bill type matching our database schema
 export interface DBBill {
