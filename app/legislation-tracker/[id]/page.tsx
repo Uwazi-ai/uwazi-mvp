@@ -8,19 +8,18 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Navbar } from "@/components/navbar"
 import { Providers } from "@/components/providers"
-import { 
-  ArrowLeft, 
-  BookmarkPlus, 
+import {
+  ArrowLeft,
+  BookmarkPlus,
   BookmarkCheck,
-  ExternalLink, 
-  Calendar, 
-  User, 
+  ExternalLink,
+  Calendar,
+  User,
   MapPin,
-  Building2,
   FileText,
   Clock,
   Scale,
-  Loader2
+  Loader2,
 } from "lucide-react"
 
 interface Bill {
@@ -81,7 +80,7 @@ function formatDate(dateStr: string | null) {
   return new Date(dateStr).toLocaleDateString("en-US", {
     year: "numeric",
     month: "long",
-    day: "numeric"
+    day: "numeric",
   })
 }
 
@@ -113,7 +112,6 @@ function LegislationDetailContent() {
         setIsLoading(false)
       }
     }
-
     if (params.id) {
       fetchBill()
     }
@@ -121,7 +119,7 @@ function LegislationDetailContent() {
 
   if (isLoading) {
     return (
-<div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-background">
         <Navbar />
         <main className="px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
           <div className="mx-auto max-w-3xl flex items-center justify-center py-20">
@@ -164,22 +162,18 @@ function LegislationDetailContent() {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      
       <main className="px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
         <div className="mx-auto max-w-3xl">
           {/* Back Link */}
           <Link
             href="/legislation-tracker"
-            className="mt-6 inline-block rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-white hover:bg-white/10"
+            className="mb-6 inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
           >
+            <ArrowLeft className="h-4 w-4" />
             Back to Legislation Tracker
           </Link>
-        </div>
-      </main>
-    )
-  }
 
-{/* Bill Card */}
+          {/* Bill Card */}
           <Card className="border-border bg-card">
             <CardHeader className="space-y-4 border-b border-border">
               {/* Badges */}
@@ -191,9 +185,7 @@ function LegislationDetailContent() {
                   {getLevelLabel(bill.level, bill.state)}
                 </Badge>
                 {bill.chamber && (
-                  <Badge variant="outline">
-                    {bill.chamber}
-                  </Badge>
+                  <Badge variant="outline">{bill.chamber}</Badge>
                 )}
                 <Badge variant="secondary" className={getStatusColor(bill.status)}>
                   {bill.status || "Unknown Status"}
@@ -274,10 +266,7 @@ function LegislationDetailContent() {
               <div className="flex flex-col gap-3 border-t border-border pt-6 sm:flex-row">
                 <Button
                   onClick={() => setIsTracked(!isTracked)}
-                  className={isTracked 
-                    ? "gap-2 bg-primary text-primary-foreground hover:bg-primary/90" 
-                    : "gap-2"
-                  }
+                  className={isTracked ? "gap-2 bg-primary text-primary-foreground hover:bg-primary/90" : "gap-2"}
                   variant={isTracked ? "default" : "outline"}
                 >
                   {isTracked ? (
@@ -306,7 +295,9 @@ function LegislationDetailContent() {
 
           {/* Ask Uwazi CTA */}
           <div className="mt-8 rounded-lg border border-border bg-card p-6">
-            <h2 className="mb-3 text-lg font-semibold text-foreground">Have questions about this bill?</h2>
+            <h2 className="mb-3 text-lg font-semibold text-foreground">
+              Have questions about this bill?
+            </h2>
             <p className="mb-4 text-muted-foreground">
               Ask Uwazi to explain what this legislation means for you in plain English.
             </p>
@@ -320,10 +311,19 @@ function LegislationDetailContent() {
           {/* Source Attribution */}
           <div className="mt-8 text-center text-sm text-muted-foreground">
             <p>
-              Data sourced from {bill.source === "legiscan" ? "LegiScan" : bill.source === "congress" ? "Congress.gov" : bill.source || "public records"}
+              Data sourced from{" "}
+              {bill.source === "legiscan"
+                ? "LegiScan"
+                : bill.source === "congress"
+                ? "Congress.gov"
+                : bill.source || "public records"}
             </p>
           </div>
         </div>
+      </main>
+    </div>
+  )
+}
 
 export default function LegislationDetailPage() {
   return (
