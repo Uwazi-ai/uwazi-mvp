@@ -47,15 +47,12 @@ function LegislationTrackerContent() {
   const fetchBills = useCallback(async () => {
     setIsLoading(true)
     setError(null)
-    
     try {
       const params = new URLSearchParams()
       if (activeFilter !== "all") params.set("level", activeFilter)
       if (searchQuery) params.set("search", searchQuery)
-      
       const response = await fetch(`/api/bills?${params.toString()}`)
       const data: BillsResponse = await response.json()
-      
       if (data.success) {
         setBills(data.bills)
         setCounts(data.counts)
@@ -93,7 +90,6 @@ function LegislationTrackerContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ source: "legiscan", state: "US" }),
       })
-      
       // Refresh the list
       await fetchBills()
     } catch (err) {
@@ -119,7 +115,6 @@ function LegislationTrackerContent() {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      
       <main className="px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
         <div className="mx-auto max-w-6xl">
           {/* Header */}
@@ -266,12 +261,15 @@ function LegislationTrackerContent() {
             </>
           )}
         </div>
+      </main>
+    </div>
+  )
+}
 
-        <TrackerClient
-          bills={billsForClient}
-          isLoggedIn={!!session?.user?.email}
-        />
-      </div>
-    </main>
+export default function LegislationTrackerPage() {
+  return (
+    <Providers>
+      <LegislationTrackerContent />
+    </Providers>
   )
 }
