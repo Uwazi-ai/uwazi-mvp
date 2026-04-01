@@ -121,7 +121,7 @@ function LegislationDetailContent() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background">
+<div className="min-h-screen bg-background">
         <Navbar />
         <main className="px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
           <div className="mx-auto max-w-3xl flex items-center justify-center py-20">
@@ -170,13 +170,16 @@ function LegislationDetailContent() {
           {/* Back Link */}
           <Link
             href="/legislation-tracker"
-            className="mb-6 inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
+            className="mt-6 inline-block rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-white hover:bg-white/10"
           >
-            <ArrowLeft className="h-4 w-4" />
             Back to Legislation Tracker
           </Link>
+        </div>
+      </main>
+    )
+  }
 
-          {/* Bill Card */}
+{/* Bill Card */}
           <Card className="border-border bg-card">
             <CardHeader className="space-y-4 border-b border-border">
               {/* Badges */}
@@ -321,10 +324,6 @@ function LegislationDetailContent() {
             </p>
           </div>
         </div>
-      </main>
-    </div>
-  )
-}
 
 export default function LegislationDetailPage() {
   return (

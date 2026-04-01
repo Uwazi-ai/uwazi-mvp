@@ -1,4 +1,5 @@
-"use client"
+import { auth } from "@/auth"
+import AskUwaziClient from "./AskUwaziClient"
 
 import { useState, useRef, useEffect } from "react"
 import { useChat } from "@ai-sdk/react"
@@ -223,7 +224,7 @@ function AskUwaziContent() {
   const trackedBillsCount = 2
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
+<div className="flex min-h-screen flex-col bg-background">
       <Navbar />
 
       <div className="flex flex-1 overflow-hidden">
@@ -534,10 +535,8 @@ function AskUwaziContent() {
   )
 }
 
-export default function AskUwaziPage() {
-  return (
-    <Providers>
-      <AskUwaziContent />
-    </Providers>
+        <AskUwaziClient isLoggedIn={!!session?.user?.email} />
+      </div>
+    </main>
   )
 }

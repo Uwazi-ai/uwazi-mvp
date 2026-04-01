@@ -266,15 +266,12 @@ function LegislationTrackerContent() {
             </>
           )}
         </div>
-      </main>
-    </div>
-  )
-}
 
-export default function LegislationTrackerPage() {
-  return (
-    <Providers>
-      <LegislationTrackerContent />
-    </Providers>
+        <TrackerClient
+          bills={billsForClient}
+          isLoggedIn={!!session?.user?.email}
+        />
+      </div>
+    </main>
   )
 }
