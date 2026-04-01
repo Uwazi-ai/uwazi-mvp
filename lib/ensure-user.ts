@@ -1,4 +1,9 @@
-import { sql } from "@/lib/db"
+import { createClient } from '@supabase/supabase-js'
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
 
 export async function ensureUser({
   email,
@@ -9,11 +14,10 @@ export async function ensureUser({
   name?: string | null
   image?: string | null
 }) {
-  await sql`
-    insert into users (email, name, image)
-    values (${email}, ${name ?? null}, ${image ?? null})
-    on conflict (email) do update
-    set name  = coalesce(excluded.name, users.name),
-        image = coalesce(excluded.image, users.image)
-  `
+  await supabase
+    .from('users')
+    .upsert(
+      { email, name: name ?? null, image: image ?? null },
+      { onConflict: 'email' }
+    )
 }
