@@ -36,6 +36,7 @@ export async function getBills(filters?: {
 }): Promise<DBBill[]> {
   const { level, state, status, search, limit = 50, offset = 0 } = filters || {}
 
+  // Build dynamic query using sql.query() for parameterized queries
   let query = `SELECT * FROM bills WHERE 1=1`
   const params: (string | number)[] = []
   let paramIndex = 1
@@ -68,8 +69,9 @@ export async function getBills(filters?: {
   query += ` LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`
   params.push(limit, offset)
 
-  const result = await sql(query, params)
-  return result as DBBill[]
+  // Use sql.query() for dynamic parameterized queries
+  const result = await sql.query(query, params)
+  return result.rows as DBBill[]
 }
 
 // Get a single bill by ID
